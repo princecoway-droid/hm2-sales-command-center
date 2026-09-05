@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/*
+ * Stage 1 styling is deliberately plain - enough structure to read the shell
+ * clearly, no design system yet. The dashboard visual language arrives with the
+ * dashboard itself.
+ *
+ * Light-only for now: this is an internal tool used on office screens, and a
+ * half-considered dark palette would only have to be redone alongside the
+ * charts.
+ */
+@theme inline {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  font-family: var(--font-sans);
+}

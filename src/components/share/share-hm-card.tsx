@@ -1,0 +1,108 @@
+import { HmAvatar } from "@/components/hm/hm-avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  STATUS_DOT_CLASSES,
+  STATUS_LABELS,
+} from "@/components/ui/status-styles";
+import { cn } from "@/lib/utils";
+import type { PublicHmCard } from "@/lib/view-models/public-share";
+
+/**
+ * One HM, on the shared report.
+ *
+ * Related to the dashboard card and deliberately not the same component. Two
+ * differences carry the whole distinction between the private app and a link in
+ * a group chat:
+ *
+ *   Nothing here is a link. The dashboard card is one big hit area opening that
+ *   HM's screen; this one opens nothing, because there is no public HM screen
+ *   to open and a card that looked clickable would promise one.
+ *
+ *   The target track is gone. Per-HM targets are a management conversation, not
+ *   something to post to the group - so the shared card carries the four
+ *   figures the WhatsApp message carries and stops there.
+ *
+ * Sized for a phone first: two columns of figures at 375px, four across once
+ * there is room, and the name wraps rather than truncating.
+ */
+export function ShareHmCard({ hm }: { hm: PublicHmCard }) {
+  return (
+    <article
+      aria-label={`${hm.name}, ${hm.office}`}
+      className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
+    >
+      <header className="flex items-start gap-3">
+        <HmAvatar name={hm.name} photoUrl={hm.photoUrl} size="md" />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="text-sm font-semibold break-words text-slate-900">
+              {hm.name}
+            </h3>
+            {!hm.isActive ? <Badge tone="muted">Inactive</Badge> : null}
+          </div>
+          <p className="text-xs break-words text-slate-500">{hm.office}</p>
+        </div>
+
+        <span
+          className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600"
+          title="Rank by net units"
+        >
+          #{hm.rank}
+        </span>
+      </header>
+
+      <dl className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        <Figure label="Net" value={hm.netLabel} emphasis />
+        <Figure label="Key-In" value={hm.keyInLabel} />
+        <Figure
+          label="Recruitment"
+          value={hm.recruitmentLabel}
+          status={hm.recruitmentStatus}
+        />
+        <Figure label="Active HP" value={hm.activeHpLabel} />
+      </dl>
+
+      {!hm.hasMonthlyRecord ? (
+        <p className="mt-3 text-[11px] text-amber-700">
+          No monthly figures entered yet
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+type FigureProps = {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  /** A dot AND a word. Never colour alone. */
+  status?: keyof typeof STATUS_DOT_CLASSES;
+};
+
+function Figure({ label, value, emphasis, status }: FigureProps) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+        {label}
+      </dt>
+      <dd
+        className={cn(
+          "mt-0.5 flex items-center gap-1.5 font-semibold tabular-nums text-slate-900",
+          emphasis ? "text-xl leading-none" : "text-lg leading-none",
+        )}
+      >
+        {value}
+        {status && status !== "neutral" ? (
+          <>
+            <span
+              aria-hidden
+              className={cn("size-2 rounded-full", STATUS_DOT_CLASSES[status])}
+            />
+            <span className="sr-only">{STATUS_LABELS[status]}</span>
+          </>
+        ) : null}
+      </dd>
+    </div>
+  );
+}
