@@ -251,10 +251,14 @@ function buildWeekly(hm: HMMonthlyCalculatedPerformance): HmWeeklyModel {
 /**
  * The Extrade mix.
  *
- * The percentages are the engine's, off Net, and the balance is the engine's
- * signed identity. Nothing is divided here - which matters more on this screen
- * than anywhere else, because Extrade over Net is exactly the sum somebody
- * would be tempted to write inline next to two numbers already on the page.
+ * The percentages are the engine's, both off TOTAL KEY-IN, and the balance is
+ * the engine's signed difference against the same total. Nothing is divided
+ * here - which matters more on this screen than anywhere else, because Extrade
+ * over Net is exactly the sum somebody would be tempted to write inline next to
+ * two numbers already on the page, and Net is the wrong denominator.
+ *
+ * Extrade and Non-Extrade are independent keyed figures: the balance line
+ * describes how they sit against Key-In, it does not report a broken rule.
  */
 function buildSalesMix(hm: HMMonthlyCalculatedPerformance): HmSalesMixModel {
   const hasSplit = hm.extradeUnits !== null && hm.nonExtradeUnits !== null;
@@ -288,10 +292,10 @@ function buildSalesMix(hm: HMMonthlyCalculatedPerformance): HmSalesMixModel {
       balance === null
         ? "Split not entered"
         : isBalanced
-          ? "Extrade and Non-Extrade account for Net exactly"
+          ? "The split comes to the Key-In total exactly"
           : balance > 0
-            ? "The split holds more units than Net"
-            : "Net is not fully allocated",
+            ? "The split comes to more than Key-In"
+            : "The split comes to less than Key-In",
   };
 }
 

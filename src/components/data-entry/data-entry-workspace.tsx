@@ -160,16 +160,14 @@ export function DataEntryWorkspace({
     () => dirtyRowIds(draft, baseline, hms, weeks),
     [draft, baseline, hms, weeks],
   );
-  const dirtySet = useMemo(() => new Set(dirtyIds), [dirtyIds]);
   const groupShiDirty = isGroupShiDirty(draft, baseline);
 
   /**
    * Live cell errors.
    *
-   * The Extrade identity is only enforced on rows that are actually being
-   * saved: an untouched row cannot be unbalanced (the database would not have
-   * accepted it), and applying the rule to a row mid-edit would flag it on the
-   * keystroke between typing Net and typing the split.
+   * Every rule left is a per-cell range rule, so a row reads the same mid-edit
+   * as it does at save time. Extrade and Non-Extrade are independent figures and
+   * are never checked against Net.
    */
   const clearedSaved = useMemo(
     () =>
@@ -189,9 +187,7 @@ export function DataEntryWorkspace({
         continue;
       }
 
-      const rowErrors = validateRow(row, weeks, {
-        requireBalance: dirtySet.has(hm.id),
-      });
+      const rowErrors = validateRow(row, weeks);
 
       if (Object.keys(rowErrors).length > 0) {
         byHm[hm.id] = rowErrors;
@@ -211,7 +207,7 @@ export function DataEntryWorkspace({
     }
 
     return byHm;
-  }, [hms, draft, weeks, dirtySet, clearedSaved, serverErrors]);
+  }, [hms, draft, weeks, clearedSaved, serverErrors]);
 
   const groupShiError = useMemo(() => {
     const parsed = toEntry(draft.groupShi);

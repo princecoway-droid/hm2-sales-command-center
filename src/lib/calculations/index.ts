@@ -41,7 +41,6 @@ export {
   hasAnyKeyIn,
   hasRecordedData,
   isEntered,
-  isSaveableSplit,
   netRatio,
   nonExtradePercentage,
   percentageOf,

@@ -4,7 +4,7 @@
  *   npm run test:unit
  *
  * Covers the pure logic that later stages will lean on hardest: the Extrade
- * identity, the draft-versus-save split, quarter derivation, the irregular
+ * figures, the draft-versus-save split, quarter derivation, the irregular
  * Coway sales week, and role-based navigation. Every schema here mirrors a
  * database constraint - supabase/tests/schema.test.mjs proves the database side
  * of the same rules.
@@ -13,7 +13,6 @@
 import {
   hmMonthlyPerformanceSchema,
   hmMonthlyPerformanceDraftSchema,
-  isExtradeSplitBalanced,
   hmWeeklyPerformanceSchema,
   groupMonthlyMetricsSchema,
 } from "@/lib/validation/performance";
@@ -63,7 +62,7 @@ check(
   monthSchema.safeParse({ year: "2026", month: "9" }).success,
 );
 
-console.log("\n[B] hm_monthly_performance: the Extrade rule");
+console.log("\n[B] hm_monthly_performance: Extrade and Non-Extrade are independent");
 const balanced = {
   hm_id: HM,
   month_id: MONTH,
@@ -75,25 +74,44 @@ const balanced = {
   extrade_units: 24,
   non_extrade_units: 16,
 };
-check("balanced record accepted", hmMonthlyPerformanceSchema.safeParse(balanced).success);
+check(
+  "a record whose split happens to come to Net is accepted",
+  hmMonthlyPerformanceSchema.safeParse(balanced).success,
+);
 
-const unbalanced = { ...balanced, extrade_units: 30 };
-const unbalancedResult = hmMonthlyPerformanceSchema.safeParse(unbalanced);
-check("unbalanced record rejected", !unbalancedResult.success);
-if (!unbalancedResult.success) {
-  const errors = toFieldErrors(unbalancedResult.error);
-  check(
-    "error attached to BOTH extrade fields",
-    Boolean(errors.extrade_units) && Boolean(errors.non_extrade_units),
-    JSON.stringify(Object.keys(errors)),
-  );
-  check(
-    "message names the actual numbers",
-    errors.extrade_units[0].includes("30") &&
-      errors.extrade_units[0].includes("40"),
-    errors.extrade_units[0],
-  );
-}
+// The case the old identity refused. Total Key-In 72, Net 65, Extrade 27,
+// Non-Extrade 24: three separate figures off three separate reports.
+check(
+  "a split that does not come to Net is accepted",
+  hmMonthlyPerformanceSchema.safeParse({
+    ...balanced,
+    net_units: 65,
+    extrade_units: 27,
+    non_extrade_units: 24,
+  }).success,
+);
+check(
+  "a split larger than Net is accepted",
+  hmMonthlyPerformanceSchema.safeParse({ ...balanced, extrade_units: 30 }).success,
+);
+check(
+  "Net 0 with a real split is accepted",
+  hmMonthlyPerformanceSchema.safeParse({
+    ...balanced,
+    net_units: 0,
+    extrade_units: 5,
+    non_extrade_units: 0,
+  }).success,
+);
+check(
+  "a negative Extrade is still rejected",
+  !hmMonthlyPerformanceSchema.safeParse({ ...balanced, extrade_units: -1 }).success,
+);
+check(
+  "a negative Non-Extrade is still rejected",
+  !hmMonthlyPerformanceSchema.safeParse({ ...balanced, non_extrade_units: -1 })
+    .success,
+);
 
 check(
   "SHI above 100 rejected",
@@ -122,7 +140,7 @@ check(
   hmMonthlyPerformanceDraftSchema.safeParse({ net_units: 40 }).success,
 );
 check(
-  "draft accepts an unbalanced in-progress split",
+  "draft accepts a split that does not come to Net",
   hmMonthlyPerformanceDraftSchema.safeParse({
     net_units: 40,
     extrade_units: 24,
@@ -134,27 +152,14 @@ check(
   !hmMonthlyPerformanceDraftSchema.safeParse({ shi_percentage: 150 }).success,
 );
 check(
-  "isExtradeSplitBalanced false while incomplete",
-  isExtradeSplitBalanced({ net_units: 40, extrade_units: 24, non_extrade_units: undefined }) ===
-    false,
+  "a draft may leave fields out; the save schema still requires them",
+  hmMonthlyPerformanceDraftSchema.safeParse({ net_units: 40 }).success &&
+    !hmMonthlyPerformanceSchema.safeParse({ net_units: 40 }).success,
 );
 check(
-  "isExtradeSplitBalanced true once it adds up",
-  isExtradeSplitBalanced({ net_units: 40, extrade_units: 24, non_extrade_units: 16 }) === true,
-);
-check(
-  "the SAME draft that passes the draft schema fails the save schema",
-  hmMonthlyPerformanceDraftSchema.safeParse({
-    hm_id: HM,
-    month_id: MONTH,
-    net_units: 40,
-    extrade_units: 24,
-    non_extrade_units: 0,
-  }).success &&
-    !hmMonthlyPerformanceSchema.safeParse({
-      ...balanced,
-      non_extrade_units: 0,
-    }).success,
+  "the split is never what makes a save fail",
+  hmMonthlyPerformanceSchema.safeParse({ ...balanced, non_extrade_units: 0 })
+    .success,
 );
 
 console.log("\n[D] weekly + group");

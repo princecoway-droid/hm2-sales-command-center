@@ -168,14 +168,20 @@ console.log("\n[S3-A] the worked example, end to end");
   check("Target is 100", hm.targetNetUnits === 100);
   check("Achievement 72/100 is 72%", close(hm.achievementPct, 72));
   check("Net Ratio 72/72 is 100%", close(hm.netRatioPct, 100));
-  check("Extrade 28 of 72 is 38.9%", formatPercentage(hm.extradePct) === "38.9%");
   check(
-    "Non-Extrade 44 of 72 is 61.1%",
+    "Extrade 28 of 72 KEY-IN is 38.9%",
+    formatPercentage(hm.extradePct) === "38.9%",
+  );
+  check(
+    "Non-Extrade 44 of 72 KEY-IN is 61.1%",
     formatPercentage(hm.nonExtradePct) === "61.1%",
   );
-  check("Extrade + Non-Extrade = Net, so the balance is 0", hm.splitBalance === 0);
   check(
-    "the two shares add back to 100%",
+    "the split happens to cover Key-In here, so the balance is 0",
+    hm.splitBalance === 0,
+  );
+  check(
+    "the two shares add back to 100% when the split covers Key-In",
     close((hm.extradePct ?? 0) + (hm.nonExtradePct ?? 0), 100, 1e-9),
   );
   check("nothing in the HM model is NaN or Infinity", everyNumberFinite(hm));
@@ -190,17 +196,42 @@ check("Net Ratio of a blank Net is null", netRatio(null, 80) === null);
   check(
     "calculateSplitPercentages agrees with the parts",
     formatPercentage(split.extradePct) === "38.9%" &&
-      formatPercentage(split.nonExtradePct) === "61.1%" &&
-      split.balance === 0,
+      formatPercentage(split.nonExtradePct) === "61.1%",
+  );
+}
+
+{
+  // The worked example. Key-In 72, Net 65, Extrade 27, Non-Extrade 24 - three
+  // independent figures, and the percentages come off Key-In, never off Net.
+  const split = calculateSplitPercentages(72, 27, 24);
+  check(
+    "Extrade 27 of 72 Key-In is 37.5%",
+    formatPercentage(split.extradePct) === "37.5%",
+    `got ${formatPercentage(split.extradePct)}`,
+  );
+  check(
+    "Non-Extrade 24 of 72 Key-In is 33.3%",
+    formatPercentage(split.nonExtradePct) === "33.3%",
+    `got ${formatPercentage(split.nonExtradePct)}`,
+  );
+  check(
+    "the shares do NOT have to add to 100 - the figures are independent",
+    Math.round((split.extradePct ?? 0) + (split.nonExtradePct ?? 0)) === 71,
   );
 }
 
 check(
-  "splitBalance is positive when the split over-counts Net",
+  "a split of nothing keyed in has no percentages, rather than 0%",
+  calculateSplitPercentages(0, 27, 24).extradePct === null &&
+    calculateSplitPercentages(0, 27, 24).nonExtradePct === null,
+);
+
+check(
+  "splitBalance is positive when the split comes to more than Key-In",
   splitBalance(72, 30, 44) === 2,
 );
 check(
-  "splitBalance is negative while Net is not fully allocated",
+  "splitBalance is negative when it comes to less",
   splitBalance(72, 28, 40) === -4,
 );
 check("splitBalance is null while any part is blank", splitBalance(72, null, 44) === null);
@@ -252,15 +283,29 @@ console.log("\n[S3-B] edge cases: no NaN, no Infinity, no silent zero");
 }
 
 {
-  // Zero Extrade / zero Non-Extrade against a real Net.
+  // Zero Extrade / zero Non-Extrade against real Key-In.
   const allNonExtrade = singleHmMonth({
     monthly: { net: 60, target: 60, extrade: 0, nonExtrade: 60 },
+    weekly: [15, 15, 15, 15, null],
   });
   const hm = calculateOneMonth(allNonExtrade.roster, allNonExtrade.records).hms[0]!;
 
-  check("zero Extrade against a real Net is 0%, not null", close(hm.extradePct, 0));
-  check("all Non-Extrade is 100%", close(hm.nonExtradePct, 100));
-  check("the split still balances", hm.splitBalance === 0);
+  check("zero Extrade against real Key-In is 0%, not null", close(hm.extradePct, 0));
+  check("Non-Extrade 60 of 60 Key-In is 100%", close(hm.nonExtradePct, 100));
+  check("the split happens to cover Key-In, so the balance is 0", hm.splitBalance === 0);
+}
+
+{
+  // A split with no Key-In behind it: unknown shares, not 0%.
+  const noKeyIn = singleHmMonth({
+    monthly: { net: 60, target: 60, extrade: 20, nonExtrade: 40 },
+    weekly: [null, null, null, null, null],
+  });
+  const hm = calculateOneMonth(noKeyIn.roster, noKeyIn.records).hms[0]!;
+
+  check("a split with no Key-In behind it has null Extrade %", hm.extradePct === null);
+  check("...and null Non-Extrade %", hm.nonExtradePct === null);
+  check("...and Net is untouched by any of that", hm.netUnits === 60);
 }
 
 // =============================================================================
@@ -418,8 +463,10 @@ const SEPTEMBER = buildMonthRecords(TEAM, {
   check("Group Extrade 30+21+15+10 = 76", group.totalExtrade === 76);
   check("Group Non-Extrade 46+50+50+48 = 194", group.totalNonExtrade === 194);
   check(
-    "Group Extrade + Non-Extrade = Group Net",
-    group.totalExtrade + group.totalNonExtrade === group.totalNet && group.groupSplitBalance === 0,
+    "the group totals are plain sums, with no identity imposed on them",
+    group.totalExtrade + group.totalNonExtrade === 270 &&
+      group.groupSplitBalance === 270 - group.totalKeyIn,
+    `split ${group.totalExtrade + group.totalNonExtrade}, key-in ${group.totalKeyIn}`,
   );
   check(
     "Group Net Ratio is 270 / total Key-In, from the totals",
@@ -446,12 +493,16 @@ const SEPTEMBER = buildMonthRecords(TEAM, {
   );
 
   check(
-    "Group Extrade % is 76/270, off the totals",
-    close(group.groupExtradePct, (76 / 270) * 100),
+    "Group Extrade % is 76 over group TOTAL KEY-IN, off the totals",
+    close(group.groupExtradePct, (76 / group.totalKeyIn) * 100),
   );
   check(
-    "Group Extrade % + Non-Extrade % = 100",
-    close((group.groupExtradePct ?? 0) + (group.groupNonExtradePct ?? 0), 100, 1e-9),
+    "Group Non-Extrade % is 194 over the same denominator",
+    close(group.groupNonExtradePct, (194 / group.totalKeyIn) * 100),
+  );
+  check(
+    "the group shares are NOT taken off group Net",
+    !close(group.groupExtradePct, (76 / group.totalNet) * 100, 1e-6),
   );
   check("nothing in the group model is NaN or Infinity", everyNumberFinite(group));
 }

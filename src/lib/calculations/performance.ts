@@ -135,25 +135,32 @@ export function percentageOf(part: number, whole: number): number | null {
   return (part / whole) * 100;
 }
 
-/** Extrade share of Net. */
-export function extradePercentage(extrade: Entry, net: Entry): number | null {
-  if (!isEntered(extrade) || !isEntered(net)) {
+/**
+ * Extrade share of TOTAL KEY-IN: `extrade / totalKeyIn x 100`.
+ *
+ * The denominator is Total Key-In, never Net. Extrade and Non-Extrade are two
+ * independent manual figures - neither has to reconcile with Net, nor with each
+ * other, nor with Key-In - so the only fixed thing about them is the total they
+ * are read as a share of. A zero Key-In is an unknown share, not a 0% one.
+ */
+export function extradePercentage(extrade: Entry, totalKeyIn: Entry): number | null {
+  if (!isEntered(extrade) || !isEntered(totalKeyIn)) {
     return null;
   }
 
-  return percentageOf(extrade, net);
+  return percentageOf(extrade, totalKeyIn);
 }
 
-/** Non-Extrade share of Net. */
+/** Non-Extrade share of TOTAL KEY-IN. Same denominator rule as Extrade. */
 export function nonExtradePercentage(
   nonExtrade: Entry,
-  net: Entry,
+  totalKeyIn: Entry,
 ): number | null {
-  if (!isEntered(nonExtrade) || !isEntered(net)) {
+  if (!isEntered(nonExtrade) || !isEntered(totalKeyIn)) {
     return null;
   }
 
-  return percentageOf(nonExtrade, net);
+  return percentageOf(nonExtrade, totalKeyIn);
 }
 
 /** Net against the HM's own target for the month. */
@@ -184,49 +191,62 @@ export function netRatio(net: Entry, totalKeyIn: number): Percentage {
 }
 
 // -----------------------------------------------------------------------------
-// The Extrade identity
+// The Extrade mix
+// -----------------------------------------------------------------------------
+//
+// Extrade and Non-Extrade are INDEPENDENT manual inputs. There is no identity
+// between them: they need not add up to Net, they need not add up to Total
+// Key-In, and nothing here may refuse a row because they do not. The single
+// relationship the engine defines is the one below - each is expressed as a
+// share of Total Key-In.
 // -----------------------------------------------------------------------------
 
 /**
- * How far the split is from Net: `net - extrade - nonExtrade`.
+ * Total Key-In not covered by the split: `totalKeyIn - extrade - nonExtrade`.
  *
- * Positive means units are still unallocated, negative means the split
- * over-counts. `null` while any of the three is blank, because "off by 40" is a
- * misleading thing to show someone who has simply not typed the split yet.
+ * INFORMATIONAL ONLY. It is a running difference shown next to the two cells so
+ * the PA can see the arithmetic, never a rule: any value - positive, negative
+ * or zero - is a legitimate, saveable row. `null` while any of the three is
+ * blank, because "off by 40" is a misleading thing to show someone who has
+ * simply not typed the split yet.
  */
 export function extradeRemainder(
-  net: Entry,
+  totalKeyIn: Entry,
   extrade: Entry,
   nonExtrade: Entry,
 ): number | null {
-  if (!isEntered(net) || !isEntered(extrade) || !isEntered(nonExtrade)) {
+  if (!isEntered(totalKeyIn) || !isEntered(extrade) || !isEntered(nonExtrade)) {
     return null;
   }
 
-  return net - extrade - nonExtrade;
+  return totalKeyIn - extrade - nonExtrade;
 }
 
 /**
- * The signed split balance: `extrade + nonExtrade - net`.
+ * The signed split difference against Total Key-In:
+ * `extrade + nonExtrade - totalKeyIn`.
  *
  * Sign convention, which is what makes this worth a second function:
  *
- *   0         balanced - the split accounts for exactly the Net units
- *   positive  excess split units - the two halves over-count Net
- *   negative  missing split units - Net is not fully allocated yet
+ *   0         the split happens to come to exactly the Key-In total
+ *   positive  the split comes to more than Key-In
+ *   negative  the split comes to less than Key-In
  *
- * This is the exact negation of `extradeRemainder`, which answers the
- * data-entry question ("how many units are left to allocate?") and is what the
- * grid's Balance column has always shown. Both are kept, deliberately: changing
- * the sign of the one the grid uses would silently flip a colour and an arrow
- * on a screen that already works. Reporting surfaces take this one.
+ * The exact negation of `extradeRemainder`, which answers the data-entry
+ * question ("how much of Key-In is not in the split?") and is what the grid's
+ * column shows. Both are kept, deliberately: changing the sign of the one the
+ * grid uses would silently flip a colour and an arrow on a screen that already
+ * works. Reporting surfaces take this one.
+ *
+ * Like the remainder, this is a description, not a constraint - no caller may
+ * use it to decide whether a row can be saved.
  */
 export function splitBalance(
-  net: Entry,
+  totalKeyIn: Entry,
   extrade: Entry,
   nonExtrade: Entry,
 ): number | null {
-  const remainder = extradeRemainder(net, extrade, nonExtrade);
+  const remainder = extradeRemainder(totalKeyIn, extrade, nonExtrade);
 
   return remainder === null ? null : -remainder;
 }
@@ -234,51 +254,27 @@ export function splitBalance(
 export type SplitPercentages = {
   extradePct: Percentage;
   nonExtradePct: Percentage;
-  /** `extrade + nonExtrade - net`. 0 is balanced. See `splitBalance`. */
-  balance: number | null;
 };
 
 /**
- * The Extrade mix in one call, so no caller has to remember that all three
- * figures come off the same denominator.
+ * The Extrade mix in one call, so no caller has to remember that both figures
+ * come off the same denominator - Total Key-In.
  *
- * With Net at 0 both percentages are `null` rather than 0%: a share of nothing
- * is undefined, and showing "0.0% Extrade" for a month nobody has sold in reads
- * as a real, bad number. A UI that wants a zero-state can check
+ * With Key-In at 0 both percentages are `null` rather than 0%: a share of
+ * nothing is undefined, and showing "0.0% Extrade" for a month nobody has keyed
+ * in reads as a real, bad number. A UI that wants a zero-state can check
  * `extradeUnits === 0 && nonExtradeUnits === 0` itself - that is a presentation
  * decision, and it is not this function's to make.
  */
 export function calculateSplitPercentages(
-  net: Entry,
+  totalKeyIn: Entry,
   extrade: Entry,
   nonExtrade: Entry,
 ): SplitPercentages {
   return {
-    extradePct: extradePercentage(extrade, net),
-    nonExtradePct: nonExtradePercentage(nonExtrade, net),
-    balance: splitBalance(net, extrade, nonExtrade),
+    extradePct: extradePercentage(extrade, totalKeyIn),
+    nonExtradePct: nonExtradePercentage(nonExtrade, totalKeyIn),
   };
-}
-
-/**
- * Whether the row may be written to `hm_monthly_performance`.
- *
- * Mirrors the database CHECK exactly, with the blank cases spelled out. A blank
- * numeric saves as 0, so that is what the rule is applied to:
- *
- *   Net > 0   Extrade + Non-Extrade must equal Net.
- *   Net = 0   both must be 0, or blank.
- */
-export function isSaveableSplit(
-  net: Entry,
-  extrade: Entry,
-  nonExtrade: Entry,
-): boolean {
-  const netValue = isEntered(net) ? net : 0;
-  const extradeValue = isEntered(extrade) ? extrade : 0;
-  const nonExtradeValue = isEntered(nonExtrade) ? nonExtrade : 0;
-
-  return extradeValue + nonExtradeValue === netValue;
 }
 
 // -----------------------------------------------------------------------------

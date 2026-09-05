@@ -242,9 +242,14 @@ export type GroupMonthlyCalculatedPerformance = {
 
   totalExtrade: number;
   totalNonExtrade: number;
+  /** Group Extrade over group TOTAL KEY-IN, off the totals. Never off Net. */
   groupExtradePct: Percentage;
+  /** Group Non-Extrade over group TOTAL KEY-IN, off the totals. */
   groupNonExtradePct: Percentage;
-  /** `extrade + nonExtrade - net` at group level. 0 when the splits reconcile. */
+  /**
+   * `extrade + nonExtrade - totalKeyIn` at group level. Informational: the two
+   * figures are independent inputs and are not required to come to any total.
+   */
   groupSplitBalance: number;
 
   weeklyGroupKeyIn: GroupWeeklyKeyIn[];
@@ -327,12 +332,11 @@ export function calculateGroupMonthlyPerformance(
 
     totalExtrade: extrade.total,
     totalNonExtrade: nonExtrade.total,
-    groupExtradePct: percentageOf(extrade.total, net.total),
-    groupNonExtradePct: percentageOf(nonExtrade.total, net.total),
-    // Never null at group level: the three totals are always real numbers, so
-    // the identity either holds or it does not.
+    groupExtradePct: percentageOf(extrade.total, totalKeyIn),
+    groupNonExtradePct: percentageOf(nonExtrade.total, totalKeyIn),
+    // Never null at group level: the three totals are always real numbers.
     groupSplitBalance:
-      splitBalance(net.total, extrade.total, nonExtrade.total) ?? 0,
+      splitBalance(totalKeyIn, extrade.total, nonExtrade.total) ?? 0,
 
     weeklyGroupKeyIn: calculateGroupWeeklyKeyIn(hms, input.weeks),
 

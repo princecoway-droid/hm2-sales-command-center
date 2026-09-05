@@ -268,7 +268,6 @@ const FIELD_LABELS: Record<MonthlyField, string> = {
 export function validateRow(
   draft: RowDraft,
   weeks: readonly SalesWeek[],
-  options: { requireBalance?: boolean } = {},
 ): RowErrors {
   const errors: RowErrors = {};
 
@@ -309,17 +308,6 @@ export function validateRow(
         errors[weeklyCellField(week.id)] ??= issue.message;
       }
 
-      continue;
-    }
-
-    // The Extrade identity is a legitimate mid-entry state while the PA is still
-    // typing - it only has to hold at save time - so it is suppressed unless the
-    // caller asks for it.
-    const isBalanceIssue =
-      issue.code === "custom" &&
-      (head === "extrade_units" || head === "non_extrade_units");
-
-    if (isBalanceIssue && !options.requireBalance) {
       continue;
     }
 

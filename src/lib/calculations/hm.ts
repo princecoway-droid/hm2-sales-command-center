@@ -7,6 +7,7 @@ import {
   isEntered,
   netRatio,
   recruitmentStatus,
+  splitBalance,
   sumKeyIn,
   targetAchievement,
   weeklyKeyInStatus,
@@ -134,7 +135,10 @@ export type HMMonthlyCalculatedPerformance = {
   extradePct: Percentage;
   nonExtradeUnits: Entry;
   nonExtradePct: Percentage;
-  /** `extrade + nonExtrade - net`. 0 balanced, + excess, - missing. */
+  /**
+   * `extrade + nonExtrade - totalKeyIn`. Informational only: the split is not
+   * required to come to Key-In, or to Net, and no save depends on it.
+   */
   splitBalance: number | null;
 
   // Weeks
@@ -171,8 +175,10 @@ export function calculateHmMonthlyPerformance(
   const nonExtradeUnits = monthly?.nonExtradeUnits ?? null;
   const recruitment = monthly?.recruitment ?? null;
 
+  // Both shares come off Total Key-In, never Net: Extrade and Non-Extrade are
+  // independent manual figures that need not reconcile with Net at all.
   const split = calculateSplitPercentages(
-    netUnits,
+    totalKeyIn,
     extradeUnits,
     nonExtradeUnits,
   );
@@ -200,7 +206,7 @@ export function calculateHmMonthlyPerformance(
     extradePct: split.extradePct,
     nonExtradeUnits,
     nonExtradePct: split.nonExtradePct,
-    splitBalance: split.balance,
+    splitBalance: splitBalance(totalKeyIn, extradeUnits, nonExtradeUnits),
 
     weeklyPerformance,
 
