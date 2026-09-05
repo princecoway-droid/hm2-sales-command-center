@@ -196,8 +196,11 @@ group_monthly_metrics    (month_id)        unique
 
 ### Rules the database enforces
 
-- **Extrade + Non-Extrade = Net Units.** The percentages are *computed for
-  display*, never stored.
+- **Extrade and Non-Extrade are independent keyed figures.** Neither is a share
+  of Net. They are not required to sum to Net Units, to Total Key-In, or to each
+  other — the PA enters each one as it appears on its own Coway report. The
+  percentages are *computed for display* against **Total Key-In**, never stored.
+  (Both columns are still natural numbers: a negative split is refused.)
 - **SHI is keyed in, never calculated.** HM SHI comes from Coway eTrust. Group
   SHI is entered separately, also from eTrust, and is *never* an average of HM
   SHI values.
@@ -216,16 +219,16 @@ rows, so there is nothing to keep in sync.
 
 ### Partial data entry
 
-The Extrade identity is a hard `CHECK` constraint, so no saved row can break it.
-Half-filled forms never reach it: drafts live in React state and are validated
-with the draft schemas, which allow missing fields while still catching
-out-of-range numbers. Only the complete, balanced shape is allowed to reach the
+Half-filled forms never reach the database: drafts live in React state and are
+validated with the draft schemas, which allow missing fields while still
+catching out-of-range numbers. Only the complete shape is allowed to reach the
 database.
 
-In the grid the same split is expressed per row: the identity is enforced on the
-rows about to be saved, not on every keystroke, so a PA who types Net before the
-Extrade breakdown is not fighting an error the whole way. The `Balance` column
-shows the gap while it is being closed.
+There is no cross-field rule left on a grid row — every rule is a per-cell range
+rule — so a row that is valid while being typed is valid to save, and a PA who
+types Net before the Extrade breakdown is not fighting an error the whole way.
+The `Balance` column states how much of the Key-In total the split covers; it is
+a running difference shown for information, and any value in it saves.
 
 ### Blank is not zero
 
@@ -289,9 +292,9 @@ All sales figures are **units**. No RM anywhere in V1 KPIs.
 | **Recruitment** | New recruitment for that month only. Never cumulative, never carried forward. |
 | **Active HP** | Keyed in from eTrust: HPs with at least one net sale. **Never** derived from sales. |
 | **SHI** | Keyed in from eTrust. **Never** calculated, never derived from other KPIs. |
-| **Extrade %** | `Extrade / Net × 100` |
-| **Non-Extrade %** | `Non-Extrade / Net × 100` |
-| **Split balance** | `Extrade + Non-Extrade − Net`. `0` balanced, `+` excess, `−` unallocated. |
+| **Extrade %** | `Extrade / Total Key-In × 100`. The denominator is **never** Net. |
+| **Non-Extrade %** | `Non-Extrade / Total Key-In × 100`. Same denominator. |
+| **Split balance** | `Extrade + Non-Extrade − Total Key-In`. Informational: the two figures are independent inputs and the shares do not have to add to 100%. |
 
 Group figures sum the HM figures — Key-In, Net, Target, Recruitment, Active HP,
 Extrade, Non-Extrade — and every group percentage is calculated **from those
@@ -299,11 +302,12 @@ totals**, never by averaging HM percentages. The mean of four achievement
 percentages silently weights a 20-unit target the same as a 200-unit one.
 
 Two balance functions exist and both are kept deliberately.
-`extradeRemainder(net, extrade, nonExtrade)` answers the data-entry question
-("how many units are left to allocate?") and is what the grid's Balance column
-has always shown; `splitBalance()` is its negation and carries the reporting
-sign convention above. Changing the sign of the first would flip a colour on a
-screen that already works.
+`extradeRemainder(totalKeyIn, extrade, nonExtrade)` answers the data-entry
+question ("how much of Key-In is not in the split?") and is what the grid's
+Balance column has always shown; `splitBalance()` is its negation and carries
+the reporting sign convention above. Changing the sign of the first would flip a
+colour on a screen that already works. Neither is a rule: no save, anywhere,
+depends on either value.
 
 ### Group SHI is read, never derived
 
@@ -344,7 +348,7 @@ A metric with a zero or missing denominator is `number | null`, and `null` means
 - Target `0` → `achievementPct` is `null`. An HM with no target has an unknown
   achievement, not a 0% one, and the difference shows the moment it is ranked.
 - Total Key-In `0` → `netRatioPct` is `null`.
-- Net `0` → `extradePct` and `nonExtradePct` are `null`. A UI wanting a
+- Total Key-In `0` → `extradePct` and `nonExtradePct` are `null`. A UI wanting a
   zero-state can check `extradeUnits === 0 && nonExtradeUnits === 0` itself;
   that is a presentation decision.
 - Previous month Net `0` → `percentageChange` is `null`, but `differenceUnits`

@@ -266,7 +266,7 @@ await expectReject(
 );
 
 // -----------------------------------------------------------------------------
-console.log("\n[7] hm_monthly_performance: the Extrade rule");
+console.log("\n[7] hm_monthly_performance: Extrade and Non-Extrade are independent");
 // -----------------------------------------------------------------------------
 const hm = await one(`select id from public.hms where name = 'Sample HM A'`);
 
@@ -275,22 +275,50 @@ await run(
      (hm_id, month_id, net_units, target_net_units, recruitment, active_hp,
       shi_percentage, extrade_units, non_extrade_units)
    values ('${hm.id}', '${sept.id}', 40, 50, 3, 12, 87.50, 24, 16)`,
-  "balanced record accepted (24 + 16 = 40)",
+  "record accepted (24 + 16 = 40)",
 );
 
-await expectReject(
+await run(
   `update public.hm_monthly_performance set extrade_units = 30
      where hm_id = '${hm.id}' and month_id = '${sept.id}'`,
-  "unbalanced split rejected (30 + 16 <> 40)",
-  "hm_monthly_performance_extrade_split",
+  "a split that no longer comes to Net is accepted (30 + 16 <> 40)",
 );
 
 await run(
   `update public.hm_monthly_performance
-      set net_units = 50, extrade_units = 30, non_extrade_units = 20
+      set net_units = 65, extrade_units = 27, non_extrade_units = 24
     where hm_id = '${hm.id}' and month_id = '${sept.id}'`,
-  "whole-row update keeps the identity (30 + 20 = 50)",
+  "the worked example is accepted (Net 65, Extrade 27, Non-Extrade 24)",
 );
+
+await run(
+  `update public.hm_monthly_performance
+      set net_units = 0, extrade_units = 5, non_extrade_units = 0
+    where hm_id = '${hm.id}' and month_id = '${sept.id}'`,
+  "Net 0 with a real split is accepted",
+);
+
+await expectReject(
+  `update public.hm_monthly_performance set extrade_units = -1
+     where hm_id = '${hm.id}' and month_id = '${sept.id}'`,
+  "a negative Extrade is still rejected",
+  "hm_monthly_performance_extrade_natural",
+);
+await expectReject(
+  `update public.hm_monthly_performance set non_extrade_units = -1
+     where hm_id = '${hm.id}' and month_id = '${sept.id}'`,
+  "a negative Non-Extrade is still rejected",
+  "hm_monthly_performance_non_extrade_natural",
+);
+
+const splitConstraints = Number(
+  (
+    await one(`select count(*) as c from pg_constraint
+                where conrelid = 'public.hm_monthly_performance'::regclass
+                  and conname = 'hm_monthly_performance_extrade_split'`)
+  ).c,
+);
+report("the Net-based split CHECK is gone", splitConstraints === 0);
 
 await expectReject(
   `insert into public.hm_monthly_performance (hm_id, month_id)
@@ -978,10 +1006,9 @@ report(
   JSON.stringify(monthlyRows),
 );
 
-await expectReject(
+await run(
   MONTHLY_UPSERT(90, 100, 7, 33, 79.5, 30, 50),
-  "an unbalanced upsert is still refused by the CHECK",
-  "hm_monthly_performance_extrade_split",
+  "an upsert whose split does not come to Net is accepted",
 );
 
 await run(

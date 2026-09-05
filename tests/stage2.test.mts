@@ -20,7 +20,6 @@ import {
   formatPercentage,
   hasAnyKeyIn,
   hasRecordedData,
-  isSaveableSplit,
   nonExtradePercentage,
   percentageOf,
   recruitmentStatus,
@@ -188,10 +187,27 @@ console.log("\n[S2-D] ratios");
 check("28 of 76 is 36.8%", formatPercentage(percentageOf(28, 76)) === "36.8%");
 check("48 of 76 is 63.2%", formatPercentage(percentageOf(48, 76)) === "63.2%");
 check(
-  "extrade + non-extrade percentages of a balanced split add to 100",
+  "both shares are taken off TOTAL KEY-IN, never Net",
+  formatPercentage(extradePercentage(27, 72)) === "37.5%" &&
+    formatPercentage(nonExtradePercentage(24, 72)) === "33.3%",
+);
+check(
+  "a split that happens to cover Key-In exactly adds to 100",
   Math.round(
     (extradePercentage(28, 76) ?? 0) + (nonExtradePercentage(48, 76) ?? 0),
   ) === 100,
+);
+check(
+  "a share of nothing keyed in is null, not 0%",
+  extradePercentage(27, 0) === null && nonExtradePercentage(24, 0) === null,
+);
+check(
+  "a blank figure has no share",
+  extradePercentage(null, 72) === null && extradePercentage(27, null) === null,
+);
+check(
+  "an entered zero against real Key-In is 0%, not blank",
+  extradePercentage(0, 72) === 0,
 );
 check(
   "a zero denominator is null, not 0 - unknown is not the same as none",
@@ -203,18 +219,19 @@ check("null percentage renders as an em dash", formatPercentage(null) === "—")
 check("blank entry renders as an em dash, never 0", formatEntry(null) === "—");
 check("an entered zero renders as 0", formatEntry(0) === "0");
 
-console.log("\n[S2-E] the Extrade identity");
-check("28 + 48 = 76 balances", isSaveableSplit(76, 28, 48));
-check("28 + 44 does not balance against 76", !isSaveableSplit(76, 28, 44));
-check("Net 0 with a 0 split is saveable", isSaveableSplit(0, 0, 0));
-check("Net 0 with blanks is saveable (blank saves as 0)", isSaveableSplit(null, null, null));
-check("Net 0 with a non-zero split is rejected", !isSaveableSplit(0, 5, 0));
+console.log("\n[S2-E] Extrade and Non-Extrade are independent inputs");
 check(
-  "Net entered but split still blank is not saveable",
-  !isSaveableSplit(76, null, null),
+  "the remainder is measured against Key-In, not Net",
+  extradeRemainder(76, 28, 40) === 8,
 );
-check("remainder shows what is left to allocate", extradeRemainder(76, 28, 40) === 8);
-check("remainder is negative when the split overshoots", extradeRemainder(76, 50, 40) === -14);
+check(
+  "the remainder is negative when the split exceeds Key-In",
+  extradeRemainder(76, 50, 40) === -14,
+);
+check(
+  "the worked example leaves a remainder and that is fine",
+  extradeRemainder(72, 27, 24) === 21,
+);
 check(
   "remainder is null while any of the three is blank",
   extradeRemainder(76, 28, null) === null,
@@ -264,36 +281,44 @@ const balancedRow = {
   weekly: [{ week_id: WEEKS[0].id, keyin_units: 20 }],
 };
 
-check("a balanced grid row is accepted", gridRowSchema.safeParse(balancedRow).success);
-
-const unbalanced = gridRowSchema.safeParse({ ...balancedRow, non_extrade_units: 40 });
-check("an unbalanced grid row is rejected", !unbalanced.success);
-if (!unbalanced.success) {
-  const cells = toCellErrors(balancedRow.hm_id, unbalanced.error);
-  check(
-    "the error lands on BOTH extrade cells",
-    cells.some((c) => c.field === "extrade_units") &&
-      cells.some((c) => c.field === "non_extrade_units"),
-    JSON.stringify(cells.map((c) => c.field)),
-  );
-  check(
-    "the message names the actual numbers",
-    cells[0].message.includes("68") && cells[0].message.includes("72"),
-    cells[0].message,
-  );
-}
+check("a grid row is accepted", gridRowSchema.safeParse(balancedRow).success);
 
 check(
-  "Net 0 with a non-zero split is rejected with a Net-specific message",
-  gridRowSchema
-    .safeParse({
-      ...balancedRow,
-      net_units: 0,
-      extrade_units: 3,
-      non_extrade_units: 0,
-    })
-    .error?.issues[0]?.message.includes("Net Units is 0") === true,
+  "a split that does not come to Net is accepted",
+  gridRowSchema.safeParse({ ...balancedRow, non_extrade_units: 40 }).success,
 );
+check(
+  "the worked example saves: Key-In 72, Net 65, Extrade 27, Non-Extrade 24",
+  gridRowSchema.safeParse({
+    ...balancedRow,
+    net_units: 65,
+    extrade_units: 27,
+    non_extrade_units: 24,
+  }).success,
+);
+check(
+  "Net 0 with a non-zero split is accepted",
+  gridRowSchema.safeParse({
+    ...balancedRow,
+    net_units: 0,
+    extrade_units: 3,
+    non_extrade_units: 0,
+  }).success,
+);
+
+const negativeSplit = gridRowSchema.safeParse({
+  ...balancedRow,
+  extrade_units: -1,
+});
+check("a negative Extrade is still rejected", !negativeSplit.success);
+if (!negativeSplit.success) {
+  const cells = toCellErrors(balancedRow.hm_id, negativeSplit.error);
+  check(
+    "and the error lands on the cell that carries it",
+    cells.some((c) => c.field === "extrade_units"),
+    JSON.stringify(cells.map((c) => c.field)),
+  );
+}
 
 check(
   "a row with everything blank is saveable (nothing entered yet)",
@@ -524,12 +549,38 @@ const partial: RowDraft = {
 };
 
 check(
-  "an in-progress row with Net set but no split yet is NOT flagged while typing",
+  "an in-progress row with Net set but no split yet is not flagged",
   Object.keys(validateRow(partial, WEEKS)).length === 0,
 );
 check(
-  "the same row IS flagged once it is about to be saved",
-  Boolean(validateRow(partial, WEEKS, { requireBalance: true }).extrade_units),
+  "and it is not flagged at save time either - there is no rule to break",
+  Object.keys(validateRow(partial, WEEKS)).length === 0,
+);
+check(
+  "a row whose split does not come to Net is clean",
+  Object.keys(
+    validateRow(
+      {
+        ...partial,
+        monthly: {
+          ...partial.monthly,
+          net_units: "65",
+          extrade_units: "27",
+          non_extrade_units: "24",
+        },
+      },
+      WEEKS,
+    ),
+  ).length === 0,
+);
+check(
+  "a negative Extrade is still flagged on its own cell",
+  Boolean(
+    validateRow(
+      { ...partial, monthly: { ...partial.monthly, extrade_units: "-1" } },
+      WEEKS,
+    ).extrade_units,
+  ),
 );
 check(
   "unparseable text is reported on the exact cell",
@@ -582,7 +633,7 @@ check(
   ),
 );
 check(
-  "a complete, balanced row is clean even under the save-time rule",
+  "a complete row is clean",
   Object.keys(
     validateRow(
       {
@@ -599,7 +650,6 @@ check(
         weekly: {},
       },
       WEEKS,
-      { requireBalance: true },
     ),
   ).length === 0,
 );

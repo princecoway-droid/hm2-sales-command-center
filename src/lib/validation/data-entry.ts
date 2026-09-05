@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { isSaveableSplit } from "@/lib/calculations/performance";
 import { uuid } from "@/lib/validation/utils";
 
 /**
@@ -22,8 +21,16 @@ import { uuid } from "@/lib/validation/utils";
  * from an unvisited one.
  *
  * Monthly figures have NOT NULL defaults of 0 in the database, so a blank there
- * saves as 0. The Extrade identity is applied to those resolved values, which is
- * what `isSaveableSplit` encodes.
+ * saves as 0.
+ *
+ * ---------------------------------------------------------------------------
+ * Extrade and Non-Extrade
+ * ---------------------------------------------------------------------------
+ * Two independent manual figures. They are range-checked like any other unit
+ * count and nothing more: they are NOT required to add up to Net, to Total
+ * Key-In, or to each other, so no rule here may reject a row on that basis.
+ * Their only defined relationship is for display - each is shown as a share of
+ * Total Key-In, computed in `lib/calculations`.
  * ---------------------------------------------------------------------------
  */
 
@@ -81,9 +88,7 @@ const gridRowFields = {
 /**
  * A row mid-edit.
  *
- * Ranges apply - a negative target is wrong the moment it is typed - but the
- * Extrade identity does not, because a PA who sets Net before the split would
- * otherwise be fighting an error on every keystroke.
+ * Ranges apply - a negative target is wrong the moment it is typed.
  */
 export const gridRowDraftSchema = z.object(gridRowFields);
 
@@ -92,26 +97,14 @@ export type GridRowDraft = z.infer<typeof gridRowDraftSchema>;
 /**
  * A row on its way to the database.
  *
- * Adds the identity the CHECK constraint enforces, so the PA gets a sentence
- * naming the numbers instead of a rejected transaction.
+ * The same shape as the draft, deliberately: every rule this row has to satisfy
+ * is a per-cell range rule, and those already hold mid-edit. There is no
+ * cross-field identity left to add - Extrade and Non-Extrade are independent of
+ * Net and of each other - so a row that is valid while being typed is valid to
+ * save. The name is kept so the Server Action and the grid keep naming the
+ * save-time schema explicitly.
  */
-export const gridRowSchema = gridRowDraftSchema.superRefine((row, ctx) => {
-  if (isSaveableSplit(row.net_units, row.extrade_units, row.non_extrade_units)) {
-    return;
-  }
-
-  const net = row.net_units ?? 0;
-  const extrade = row.extrade_units ?? 0;
-  const nonExtrade = row.non_extrade_units ?? 0;
-  const message =
-    net === 0
-      ? `Net Units is 0, so Extrade and Non-Extrade must both be 0 (currently ${extrade} and ${nonExtrade}).`
-      : `Extrade (${extrade}) + Non-Extrade (${nonExtrade}) = ${extrade + nonExtrade}, which must equal Net Units (${net}).`;
-
-  // On both inputs, so whichever cell the PA is looking at carries the message.
-  ctx.addIssue({ code: "custom", message, path: ["extrade_units"] });
-  ctx.addIssue({ code: "custom", message, path: ["non_extrade_units"] });
-});
+export const gridRowSchema = gridRowDraftSchema;
 
 export type GridRow = z.infer<typeof gridRowSchema>;
 

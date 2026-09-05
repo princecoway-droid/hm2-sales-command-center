@@ -65,10 +65,6 @@ const CONSTRAINT_MESSAGES: Record<string, ConstraintMessage> = {
   hm_monthly_performance_hm_month_key: {
     message: "This HM already has a record for that month. Edit the existing one instead.",
   },
-  hm_monthly_performance_extrade_split: {
-    message: "Extrade + Non-Extrade must add up to Net Units.",
-    field: "extrade_units",
-  },
   hm_monthly_performance_shi_range: {
     message: "SHI must be between 0 and 100.",
     field: "shi_percentage",

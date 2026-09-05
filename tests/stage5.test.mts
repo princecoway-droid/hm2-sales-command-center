@@ -771,26 +771,26 @@ section("[10] the sales mix");
   );
 
   check(
-    "Extrade % is the ENGINE's share of Net: 28 of 72",
+    "Extrade % is the ENGINE's share of TOTAL KEY-IN: 28 of 72",
     mix.extrade.percentageLabel === "38.9%",
     `got ${mix.extrade.percentageLabel}`,
   );
 
   check(
-    "Non-Extrade % is the engine's too: 44 of 72",
+    "Non-Extrade % is the engine's too: 44 of 72 Key-In",
     mix.nonExtrade.unitsLabel === formatUnits(44) &&
       mix.nonExtrade.percentageLabel === "61.1%",
     `got ${mix.nonExtrade.percentageLabel}`,
   );
 
   check(
-    "the two shares are drawn against Net, so they add up to the whole bar",
+    "the bars are drawn to the same shares the labels state",
     close(mix.extrade.barPct, 38.888, 0.01) &&
       close(mix.nonExtrade.barPct, 61.111, 0.01),
   );
 
   check(
-    "a split that reconciles reads OK",
+    "a split that happens to come to the Key-In total reads OK",
     mix.isBalanced && mix.balanceLabel === "OK",
   );
 
@@ -798,23 +798,42 @@ section("[10] the sales mix");
 }
 
 {
-  // The database CHECK refuses an unbalanced row, so this can only arrive from
-  // data written before the constraint - it still has to read honestly.
-  const roster = createRoster(["Off"]);
+  // The worked example: Key-In 72, Net 65, Extrade 27, Non-Extrade 24. Three
+  // independent figures - a perfectly ordinary month that the old Net identity
+  // would have refused.
+  const roster = createRoster(["Split"]);
   const month = buildMonthRecords(roster, {
     year: 2026,
     month: 9,
     hms: {
-      Off: { monthly: { net: 50, target: 60, extrade: 30, nonExtrade: 21 } },
+      Split: {
+        monthly: { net: 65, target: 100, extrade: 27, nonExtrade: 24 },
+        weekly: [20, 18, 13, 21, null],
+      },
     },
   });
 
-  const mix = detailOf(roster, [month], month, "Off").salesMix;
+  const mix = detailOf(roster, [month], month, "Split").salesMix;
 
   check(
-    "an over-allocated split shows the signed difference, not a silent OK",
-    !mix.isBalanced && mix.balanceLabel === "+1",
+    "Extrade 27 of 72 Key-In is 37.5%, NOT 27 of Net 65",
+    mix.extrade.percentageLabel === "37.5%",
+    `got ${mix.extrade.percentageLabel}`,
+  );
+  check(
+    "Non-Extrade 24 of 72 Key-In is 33.3%",
+    mix.nonExtrade.percentageLabel === "33.3%",
+    `got ${mix.nonExtrade.percentageLabel}`,
+  );
+  check(
+    "the split is shown as a plain signed difference against Key-In",
+    !mix.isBalanced && mix.balanceLabel === "−21",
     `got ${mix.balanceLabel}`,
+  );
+  check(
+    "...described against Key-In, not as a broken rule about Net",
+    mix.balanceNote.includes("Key-In") && !mix.balanceNote.includes("Net"),
+    mix.balanceNote,
   );
 }
 

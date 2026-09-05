@@ -10,27 +10,31 @@ import {
  * Performance schemas.
  *
  * ---------------------------------------------------------------------------
- * Validation strategy for the Extrade rule
+ * Extrade and Non-Extrade
  * ---------------------------------------------------------------------------
- * `extrade_units + non_extrade_units = net_units` is a hard CHECK constraint in
- * the database, so a saved row can never break it. That constraint is unhelpful
- * mid-typing, though: a PA who sets Net to 40 before touching the split would be
- * fighting it on every keystroke if the form wrote through on change.
+ * Two INDEPENDENT manual figures. The PA keys each one in freely: they are not
+ * required to add up to Net, nor to Total Key-In, nor to each other, and no
+ * schema here may refuse a record on that basis. Each is range-checked as an
+ * ordinary unit count - negatives and fractions are still rejected - and that
+ * is the whole of the rule.
  *
- * So the split is two schemas over the same shape:
+ * Their only defined relationship is for display, and it lives in
+ * `lib/calculations`:
+ *
+ *   Extrade %      = extrade_units     / TOTAL KEY-IN x 100
+ *   Non-Extrade %  = non_extrade_units / TOTAL KEY-IN x 100
+ *
+ * The denominator is Total Key-In, never Net.
+ * ---------------------------------------------------------------------------
+ *
+ * Every shape is still two schemas:
  *
  *   `*DraftSchema`  what a half-filled form is allowed to look like. Fields may
  *                   be blank; ranges are still checked so bad numbers are caught
  *                   early. Never written to the database.
  *
- *   `*Schema`       what a save must satisfy - every field present and the
- *                   Extrade identity holding. This is the only schema a
- *                   mutation is allowed to use.
- *
- * Drafts live in React form state, so an incomplete record never reaches
- * Postgres in the first place; the constraint is the backstop, not the
- * first line of defence.
- * ---------------------------------------------------------------------------
+ *   `*Schema`       what a save must satisfy - every field present and in range.
+ *                   This is the only schema a mutation is allowed to use.
  *
  * Two things deliberately absent, per the reporting rules:
  *   * No extrade/non-extrade percentages - those are computed for display.
@@ -54,25 +58,13 @@ const monthlyPerformanceFields = {
   non_extrade_units: naturalNumber("Non-Extrade units"),
 };
 
-export const hmMonthlyPerformanceSchema = z
-  .object(monthlyPerformanceFields)
-  .superRefine((value, ctx) => {
-    const total = value.extrade_units + value.non_extrade_units;
-
-    if (total !== value.net_units) {
-      const message = `Extrade (${value.extrade_units}) + Non-Extrade (${value.non_extrade_units}) = ${total}, which must equal Net Units (${value.net_units}).`;
-
-      // Reported on both inputs so whichever one the PA is looking at shows it.
-      ctx.addIssue({ code: "custom", message, path: ["extrade_units"] });
-      ctx.addIssue({ code: "custom", message, path: ["non_extrade_units"] });
-    }
-  });
+export const hmMonthlyPerformanceSchema = z.object(monthlyPerformanceFields);
 
 export type HMMonthlyPerformanceInput = z.infer<
   typeof hmMonthlyPerformanceSchema
 >;
 
-/** In-progress form state. Range rules apply; the Extrade identity does not. */
+/** In-progress form state. The same range rules, on fields that may be absent. */
 export const hmMonthlyPerformanceDraftSchema = z
   .object(monthlyPerformanceFields)
   .partial();
@@ -80,26 +72,6 @@ export const hmMonthlyPerformanceDraftSchema = z
 export type HMMonthlyPerformanceDraft = z.infer<
   typeof hmMonthlyPerformanceDraftSchema
 >;
-
-/** True when a draft already satisfies the Extrade identity. */
-export function isExtradeSplitBalanced(
-  draft: Pick<
-    HMMonthlyPerformanceDraft,
-    "net_units" | "extrade_units" | "non_extrade_units"
-  >,
-): boolean {
-  const { net_units, extrade_units, non_extrade_units } = draft;
-
-  if (
-    net_units === undefined ||
-    extrade_units === undefined ||
-    non_extrade_units === undefined
-  ) {
-    return false;
-  }
-
-  return extrade_units + non_extrade_units === net_units;
-}
 
 // -----------------------------------------------------------------------------
 // HM weekly performance

@@ -44,12 +44,14 @@ type PerformanceGridProps = {
  * A single grid rather than the three stacked tables the brief sketches: the
  * PA reads across one HM at a time, and splitting the columns into separate
  * tables means finding the same person three times and losing the connection
- * between Net and the Extrade split that has to add up to it. The column groups
- * keep the sections legible while the row stays one row.
+ * between the Key-In total and the Extrade split shown as a share of it. The
+ * column groups keep the sections legible while the row stays one row.
  *
  * Everything derived - Key-In total, achievement, the two mix percentages, the
- * balance - is rendered read-only in line, so the arithmetic the PA would
- * otherwise do on paper is visible while they type.
+ * split difference - is rendered read-only in line, so the arithmetic the PA
+ * would otherwise do on paper is visible while they type. Both mix percentages
+ * are shares of TOTAL KEY-IN; Extrade and Non-Extrade themselves are independent
+ * figures the PA keys in freely and nothing here checks them against Net.
  */
 export function PerformanceGrid({
   hms,
@@ -222,10 +224,10 @@ export function PerformanceGrid({
             <HeaderCell label="Active HP" />
             <HeaderCell label="SHI %" hint="From eTrust" />
             <HeaderCell label="Extrade" borderLeft />
-            <HeaderCell label="%" />
+            <HeaderCell label="%" hint="Extrade / Total Key-In" />
             <HeaderCell label="Non-Ex" />
-            <HeaderCell label="%" />
-            <HeaderCell label="Balance" hint="Net − Extrade − Non-Extrade" />
+            <HeaderCell label="%" hint="Non-Extrade / Total Key-In" />
+            <HeaderCell label="Balance" hint="Total − Extrade − Non-Extrade" />
           </tr>
         </thead>
 
@@ -308,8 +310,10 @@ const PerformanceGridRow = memo(function PerformanceGridRow({
   const values = rowValues(draft, weeks);
   const weekly = weeklyEntries(draft, weeks);
   const keyInTotal = sumKeyIn(weekly);
+  // Against the Key-In total, not Net: the two split cells are independent
+  // figures, and this column only shows how much of Key-In they cover.
   const remainder = extradeRemainder(
-    values.net_units,
+    keyInTotal,
     values.extrade_units,
     values.non_extrade_units,
   );
@@ -432,9 +436,7 @@ const PerformanceGridRow = memo(function PerformanceGridRow({
         className="border-l border-slate-200"
       />
       <DerivedCell>
-        {formatPercentage(
-          extradePercentage(values.extrade_units, values.net_units),
-        )}
+        {formatPercentage(extradePercentage(values.extrade_units, keyInTotal))}
       </DerivedCell>
       <MonthlyCell
         hm={hm}
@@ -448,7 +450,7 @@ const PerformanceGridRow = memo(function PerformanceGridRow({
       />
       <DerivedCell>
         {formatPercentage(
-          nonExtradePercentage(values.non_extrade_units, values.net_units),
+          nonExtradePercentage(values.non_extrade_units, keyInTotal),
         )}
       </DerivedCell>
 
@@ -507,14 +509,22 @@ function MonthlyCell({
  * it is being typed turns a rejected save into an obvious "12 units still to
  * allocate".
  */
+/**
+ * How much of the Key-In total the split covers - a running difference, not a
+ * rule. Extrade and Non-Extrade are independent figures, so any value here is a
+ * perfectly saveable row; the column is shown in the same quiet ink as the other
+ * derived cells rather than flagged, so nothing reads as an error.
+ */
 function BalanceCell({ remainder }: { remainder: number | null }) {
   if (remainder === null) {
-    return <DerivedCell title="Enter Net, Extrade and Non-Extrade">—</DerivedCell>;
+    return (
+      <DerivedCell title="Enter Extrade and Non-Extrade">—</DerivedCell>
+    );
   }
 
   if (remainder === 0) {
     return (
-      <DerivedCell title="Extrade + Non-Extrade equals Net">
+      <DerivedCell title="Extrade + Non-Extrade comes to the Key-In total">
         <span className="inline-flex items-center gap-1 text-emerald-700">
           <span
             aria-hidden
@@ -530,10 +540,9 @@ function BalanceCell({ remainder }: { remainder: number | null }) {
     <DerivedCell
       title={
         remainder > 0
-          ? `${remainder} unit${remainder === 1 ? "" : "s"} of Net are not yet split`
-          : `The split is ${Math.abs(remainder)} over Net`
+          ? `${remainder} Key-In unit${remainder === 1 ? "" : "s"} are not in the split`
+          : `The split is ${Math.abs(remainder)} above the Key-In total`
       }
-      className="font-medium text-amber-700"
     >
       {remainder > 0 ? `+${remainder}` : remainder}
     </DerivedCell>

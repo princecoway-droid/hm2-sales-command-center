@@ -9,18 +9,17 @@ type HmSalesMixProps = {
 };
 
 /**
- * How the month's Net splits between Extrade and Non-Extrade.
+ * The month's Extrade and Non-Extrade figures, each as a share of Key-In.
  *
- * Both percentages come off Net, calculated once in the engine. Nothing here
- * divides anything - which matters more on this card than anywhere else,
- * because the two unit figures and the Net are all on the same screen and the
- * temptation to work the share out inline is exactly what this stage forbids.
+ * Both percentages come off TOTAL KEY-IN, calculated once in the engine.
+ * Nothing here divides anything - which matters more on this card than anywhere
+ * else, because the two unit figures and the Net are all on the same screen and
+ * the temptation to work the share out inline against Net is exactly what this
+ * stage forbids.
  *
- * The balance line is the point of the card as much as the split is. The
- * database refuses to store a row where the two halves do not add up to Net, so
- * a saved month should always read "OK" - and if it ever does not, saying so
- * plainly is far better than showing two convincing percentages of a total that
- * does not reconcile.
+ * The two figures are independent manual inputs: they are not required to add
+ * up to Net, to Key-In, or to each other, so the balance line below is a stated
+ * difference and not a warning about a broken record.
  */
 export function HmSalesMix({ salesMix }: HmSalesMixProps) {
   return (
@@ -51,10 +50,12 @@ export function HmSalesMix({ salesMix }: HmSalesMixProps) {
 
         <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-xs">
           <span className="text-slate-500">Split balance:</span>
+          {/* Slate, not amber, when the two do not meet: a split that does not
+              come to the Key-In total is an ordinary state, not a fault. */}
           <span
             className={cn(
               "font-semibold tabular-nums",
-              salesMix.isBalanced ? "text-emerald-700" : "text-amber-700",
+              salesMix.isBalanced ? "text-emerald-700" : "text-slate-700",
             )}
           >
             {salesMix.balanceLabel}
@@ -88,7 +89,7 @@ function MixRow({
       <div
         className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100"
         role="img"
-        aria-label={`${entry.label}: ${entry.unitsLabel} units, ${entry.percentageLabel} of net`}
+        aria-label={`${entry.label}: ${entry.unitsLabel} units, ${entry.percentageLabel} of total Key-In`}
       >
         <div
           className={cn(
