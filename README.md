@@ -531,11 +531,21 @@ is null: those callers already bypass RLS entirely, so refusing them would break
 **The public share boundary.** Stage 6 introduces the only unauthenticated view
 of business data in the application, and it is drawn in the database rather than
 in the app. `anon` has no table privileges and no policy anywhere; it may execute
-exactly one function, `public.resolve_share_report(token)`, which is
-`SECURITY DEFINER`, validates the token, and returns a hand-built JSON projection
-of **one** reporting month. That projection carries no `created_by`, no
-`updated_by`, no performance row ids, nothing from `profiles` or `auth`, and
-every sub-select in it is anchored to the token's own `month_id`.
+exactly two functions, both `SECURITY DEFINER`, both gated on the same token, and
+both returning `NULL` for every failure:
+
+| | |
+|---|---|
+| `resolve_share_report(token)` | the group report at `/share/<token>` — a hand-built JSON projection of **one** reporting month |
+| `resolve_share_hm_report(token, hm_id)` | one HM's page at `/share/<token>/hm/<hmId>` — that same month, plus **that one HM's** monthly figures for the previous month and the earlier months of the quarter |
+
+Neither projection carries `created_by`, `updated_by`, a performance row id, or
+anything from `profiles` or `auth`. Every sub-select in the group resolver is
+anchored to the token's own `month_id`; the HM resolver adds the context months
+month over month and QTD need, narrowed to a single HM and stripped of weeks,
+weekly Key-In and group SHI, so it can never be assembled into a second group
+report. It also refuses an HM the token's month is not about, so a token cannot
+be used to enumerate the HM table.
 
 The token is a capability, not an identifier: 32 bytes from the platform CSPRNG,
 base64url. It is never derived from a month id, an HM id, a date or a counter,
@@ -588,13 +598,13 @@ credential — the token is in the path — so the page that leaves the building
 sends no referrer at all rather than trusting each browser's reading of a
 weaker policy.
 
-**Known boundary: the HM id in a photo URL.** A share page renders avatars
+**Known boundary: the HM id on a share page.** A share page renders avatars
 straight from the storage bucket, and the object path is `<hm id>/<timestamp>`,
-so an HM's uuid is visible in the page source to anyone holding a link. The
-public projection drops `hmId` everywhere else on purpose; this is the one place
-it survives, and it is left alone knowingly. The id is not a capability: `anon`
-holds no privilege on any table, `resolve_share_report` refuses a uuid-shaped
-token outright, and there is no public `/hm/<id>` route. Changing it would mean
+so an HM's uuid is visible in the page source to anyone holding a link. Since the
+cards became clickable it is also in the link each one carries. Neither is a
+capability: `anon` holds no privilege on any table, both resolvers refuse a
+uuid-shaped token outright, an HM id is useful only in combination with a live
+token, and `/hm/<id>` — the private screen — is still behind login. Changing it would mean
 re-keying the bucket layout — which is also what makes `isHmPhotoPathFor()` able
 to prove an uploaded path belongs to the HM it claims — and orphaning every
 photo already stored.
@@ -998,13 +1008,17 @@ group entirely, so the authenticated shell has no code path that could render fo
 an anonymous visitor. Its "Updated" stamp is the data's own, computed in SQL from
 the month's rows, never the render clock.
 
-There is no public HM detail page. `/hm/<id>` stays behind login.
+Each HM card opens that HM's own read-only page at `/share/<token>/hm/<hmId>` —
+the same sections, the same components and the same figures as the manager's
+`/hm/<id>` screen, for the month the token names, with no month switcher and no
+way out of the token except back to the report. `/hm/<id>` itself stays behind
+login, and revoking the link closes both pages in the same instant.
 
 ---
 
 ## Not built yet
 
-HM logins, public individual HM pages, historical dashboard UI, advanced
+HM logins, historical dashboard UI, advanced
 filtering, notifications, forecasting, AI recommendations, commission, PDF or
 image export, scheduled sending and any WhatsApp API integration.
 

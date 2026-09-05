@@ -5,11 +5,17 @@ import { err, ok, type Result } from "@/lib/result";
 import { SHARE_LINK_EXPIRY_DAYS } from "@/lib/share/config";
 import { buildShareReport, parseSharePayload } from "@/lib/share/resolve";
 import {
+  buildShareHmDetail,
+  parseShareHmPayload,
+} from "@/lib/share/resolve-hm";
+import {
   generateShareToken,
   isShareTokenShaped,
   shareLinkExpiry,
 } from "@/lib/share/token";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { uuid } from "@/lib/validation/utils";
+import type { HmDetailViewModel } from "@/lib/view-models/hm-detail";
 import type { PublicShareViewModel } from "@/lib/view-models/public-share";
 import type { Month, ShareLink } from "@/types/models";
 
@@ -304,4 +310,81 @@ export async function getPublicShareReport(
   }
 
   return ok(report);
+}
+
+/**
+ * A token plus an HM -> that HM's month, or `null`.
+ *
+ * ---------------------------------------------------------------------------
+ * The same door, one room further in
+ * ---------------------------------------------------------------------------
+ *   1. shape-check the token          the same gate `getPublicShareReport` uses
+ *   2. shape-check the hm id          a uuid, or nothing happens - the RPC's
+ *                                     `p_hm_id` is typed, and a malformed id
+ *                                     should be "not available" rather than a
+ *                                     cast error crossing the wire
+ *   3. one RPC                        `resolve_share_hm_report` - validates the
+ *                                     token again, refuses an HM the token's
+ *                                     month is not about, touches the audit
+ *                                     stamp, and returns that month plus the
+ *                                     one HM's figures for the previous month
+ *                                     and the quarter to date
+ *   4. parseShareHmPayload            whatever the database sent -> typed
+ *   5. buildShareHmDetail             the Stage 3 engine and the Stage 5 HM
+ *                                     presenter - the signed-in screen's own
+ *
+ * `null` for every unusable request without distinguishing between them: a
+ * token that was never issued, one that was revoked or has expired, and an HM
+ * who is not on this month's report all look identical from outside.
+ *
+ * The `backHref` is supplied by the caller and points back at the report the HM
+ * was opened from, so the private dashboard's URL never enters a public model.
+ *
+ * One round trip, exactly like the group report. Nothing here calculates.
+ */
+/**
+ * The same id check every other HM input in the app gets, reused rather than
+ * rewritten as a regex here.
+ */
+const HM_ID = uuid("HM");
+
+export async function getPublicShareHmReport(
+  token: string,
+  hmId: string,
+  { backHref }: { backHref: string },
+): Promise<Result<HmDetailViewModel | null>> {
+  if (!isShareTokenShaped(token) || !HM_ID.safeParse(hmId).success) {
+    return ok(null);
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase.rpc("resolve_share_hm_report", {
+    p_token: token,
+    p_hm_id: hmId,
+  });
+
+  if (error) {
+    // Logged server-side, never surfaced - a database error must not become a
+    // probing oracle here any more than it may on the group report.
+    console.error("[share] hm resolve failed:", error.message);
+
+    return err("This report is unavailable.");
+  }
+
+  const payload = parseShareHmPayload(data);
+
+  if (!payload) {
+    return ok(null);
+  }
+
+  const detail = buildShareHmDetail(payload, { backHref });
+
+  if (!detail) {
+    console.error("[share] the HM month could not be assembled");
+
+    return err("This report is unavailable.");
+  }
+
+  return ok(detail);
 }

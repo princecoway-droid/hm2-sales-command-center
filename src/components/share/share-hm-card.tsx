@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { HmAvatar } from "@/components/hm/hm-avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -7,29 +9,55 @@ import {
 import { cn } from "@/lib/utils";
 import type { PublicHmCard } from "@/lib/view-models/public-share";
 
+type ShareHmCardProps = {
+  hm: PublicHmCard;
+  /**
+   * That HM's read-only view, under the same token, or `null` for a card that
+   * opens nothing.
+   *
+   * Always supplied by the report today. It stays optional because "the card is
+   * a link" and "the link is inside the token" are two separate decisions, and
+   * a future surface that has no token to build one from should render a card
+   * that is honestly inert rather than one pointing nowhere.
+   */
+  href?: string | null;
+};
+
 /**
  * One HM, on the shared report.
  *
  * Related to the dashboard card and deliberately not the same component. Two
- * differences carry the whole distinction between the private app and a link in
- * a group chat:
+ * differences carry the distinction between the private app and a link in a
+ * group chat:
  *
- *   Nothing here is a link. The dashboard card is one big hit area opening that
- *   HM's screen; this one opens nothing, because there is no public HM screen
- *   to open and a card that looked clickable would promise one.
+ *   Where it goes. The dashboard card opens `/hm/<id>`, inside the application;
+ *   this one opens `/share/<token>/hm/<id>`, which is the same figures with no
+ *   session, no navigation and no way out of the token. It never links into the
+ *   private app, and it carries no `?month=` - the token decides the month.
  *
  *   The target track is gone. Per-HM targets are a management conversation, not
  *   something to post to the group - so the shared card carries the four
  *   figures the WhatsApp message carries and stops there.
  *
+ * The hit area is the whole card, expressed the same way the dashboard's is:
+ * ONE link, on the name, stretched over the card by a positioned
+ * pseudo-element. A wrapper `<a>` around the figures would have a screen reader
+ * announce a link made of eight numbers, and would stop the text being
+ * selectable - on a report people quote into a chat.
+ *
  * Sized for a phone first: two columns of figures at 375px, four across once
  * there is room, and the name wraps rather than truncating.
  */
-export function ShareHmCard({ hm }: { hm: PublicHmCard }) {
+export function ShareHmCard({ hm, href = null }: ShareHmCardProps) {
   return (
     <article
       aria-label={`${hm.name}, ${hm.office}`}
-      className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4"
+      className={cn(
+        "rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4",
+        href
+          ? "group relative transition-colors hover:border-sky-300 hover:bg-sky-50/30 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-200"
+          : null,
+      )}
     >
       <header className="flex items-start gap-3">
         <HmAvatar name={hm.name} photoUrl={hm.photoUrl} size="md" />
@@ -37,7 +65,17 @@ export function ShareHmCard({ hm }: { hm: PublicHmCard }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h3 className="text-sm font-semibold break-words text-slate-900">
-              {hm.name}
+              {href ? (
+                <Link
+                  href={href}
+                  className="outline-none after:absolute after:inset-0 after:rounded-lg group-hover:text-sky-900"
+                >
+                  {hm.name}
+                  <span className="sr-only"> - open full performance</span>
+                </Link>
+              ) : (
+                hm.name
+              )}
             </h3>
             {!hm.isActive ? <Badge tone="muted">Inactive</Badge> : null}
           </div>
@@ -50,6 +88,20 @@ export function ShareHmCard({ hm }: { hm: PublicHmCard }) {
         >
           #{hm.rank}
         </span>
+
+        {/* The one visual addition a clickable card needs. Hover and a focus
+            ring say "this opens" on a desktop; on the phone in a WhatsApp group
+            - which is where this page is actually read - neither exists, and
+            without a chevron the card is a link nobody knows is there.
+            `aria-hidden` because the link already says where it goes. */}
+        {href ? (
+          <span
+            aria-hidden
+            className="shrink-0 self-center text-base leading-none text-slate-300 group-hover:text-sky-600"
+          >
+            ›
+          </span>
+        ) : null}
       </header>
 
       <dl className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">

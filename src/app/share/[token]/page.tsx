@@ -42,7 +42,10 @@ export default async function SharePage(props: PageProps<"/share/[token]">) {
 
   return (
     <main>
-      <PublicReport report={result.data} />
+      {/* The token goes down with the report for ONE reason: an HM card opens
+          that HM under the same token, at /share/<token>/hm/<hmId>. It is not
+          rendered, and it is not a second way to ask for data. */}
+      <PublicReport report={result.data} token={token} />
     </main>
   );
 }

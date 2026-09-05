@@ -1552,6 +1552,237 @@ report(
   ).last_accessed_at !== null,
 );
 
+// -----------------------------------------------------------------------------
+// resolve_share_hm_report: the same token, narrowed to one HM
+// -----------------------------------------------------------------------------
+//
+// The second - and last - function anon may execute. Everything the group
+// resolver has to get right, it has to get right too, so the gate is re-tested
+// from the outside rather than assumed to be shared. What is new here is the
+// narrowing: it must refuse an HM the token's month is not about, and the
+// context months it adds must carry ONE HM's figures and nobody else's.
+
+await asSuperuser(`select 1`);
+
+// February 2027: the month before the token's, and part of the same quarter -
+// so it is what month-over-month and QTD are counted from.
+// `on conflict do nothing` because an earlier section may already have opened
+// this month: what matters here is that February exists, not who created it.
+await asSuperuser(
+  `insert into public.months (year, month, label, quarter)
+     values (2027, 2, '', 1)
+   on conflict (year, month) do nothing`,
+);
+
+const shareMonthPrev = await one(
+  `select id from public.months where year = 2027 and month = 2`,
+);
+
+// A second HM with a February figure. It must never appear in the first HM's
+// context, which is the whole point of the narrowing.
+const shareHmOther = (
+  await asSuperuser(
+    `insert into public.hms (name, office, display_order)
+       values ('Sample HM Other', 'Sample Office', 91) returning id`,
+  )
+).rows[0];
+
+// An active HM with nothing keyed in for the token's month: on the report as a
+// missing record, so openable - and blank rather than absent.
+const shareHmIdle = (
+  await asSuperuser(
+    `insert into public.hms (name, office, display_order)
+       values ('Sample HM Idle', 'Sample Office', 92) returning id`,
+  )
+).rows[0];
+
+// An inactive HM with nothing for the month: not on the report at all.
+const shareHmGone = (
+  await asSuperuser(
+    `insert into public.hms (name, office, display_order, status)
+       values ('Sample HM Gone', 'Sample Office', 93, 'inactive') returning id`,
+  )
+).rows[0];
+
+await asSuperuser(
+  `insert into public.hm_monthly_performance
+     (hm_id, month_id, net_units, target_net_units, recruitment, active_hp,
+      shi_percentage, extrade_units, non_extrade_units)
+   values
+     ('${shareHm.id}', '${shareMonthPrev.id}', 30, 40, 2, 19, 70.00, 10, 20),
+     ('${shareHmOther.id}', '${shareMonthPrev.id}', 777, 800, 7, 77, 77.00, 7, 770)`,
+);
+
+const hmResolved = (
+  await asAnon(
+    `select public.resolve_share_hm_report('${TOKEN_LIVE}', '${shareHm.id}') as body`,
+  )
+).rows[0].body;
+
+report("anon can open an HM under a live token", hmResolved !== null);
+
+report(
+  "and gets the token's own month, named",
+  hmResolved?.month?.label === "March 2027" &&
+    hmResolved?.hm_id === shareHm.id,
+  JSON.stringify(hmResolved?.month),
+);
+
+report(
+  "the month's figures come back, exactly as the group report's do",
+  hmResolved?.monthly?.length === 1 &&
+    Number(hmResolved.monthly[0].net_units) === 42 &&
+    hmResolved?.weekly?.length === 1,
+);
+
+report(
+  "the previous month is in the context",
+  Array.isArray(hmResolved?.context) &&
+    hmResolved.context.some((entry) => entry.month?.label === "February 2027"),
+  JSON.stringify(hmResolved?.context?.map((entry) => entry.month?.label)),
+);
+
+const hmContext = JSON.stringify(hmResolved?.context);
+
+report(
+  "a context month carries ONLY the requested HM's rows",
+  hmResolved.context.every((entry) =>
+    (entry.monthly ?? []).every((row) => row.hm_id === shareHm.id),
+  ) && !hmContext.includes("777"),
+  hmContext?.slice(0, 200),
+);
+
+report(
+  "and no weeks, no weekly Key-In and no group SHI for a context month",
+  hmResolved.context.every((entry) => {
+    const keys = Object.keys(entry).sort();
+
+    return keys.length === 2 && keys[0] === "month" && keys[1] === "monthly";
+  }),
+);
+
+report(
+  "a LATER month is never in the context - there is no April in a March report",
+  !hmContext.includes(shareMonthB.id) && !hmContext.includes("999"),
+);
+
+const hmSerialised = JSON.stringify(hmResolved);
+
+report(
+  "no created_by or updated_by in the HM projection",
+  !hmSerialised.includes("created_by") && !hmSerialised.includes("updated_by"),
+);
+
+report(
+  "no performance row ids in it either",
+  hmResolved.monthly.every((row) => row.id === undefined) &&
+    hmResolved.context.every((entry) =>
+      (entry.monthly ?? []).every((row) => row.id === undefined),
+    ),
+);
+
+report(
+  "no profile, email or auth field anywhere",
+  !hmSerialised.includes("full_name") &&
+    !hmSerialised.includes("email") &&
+    !hmSerialised.includes('"role"'),
+);
+
+report("and no token is echoed back", !hmSerialised.includes(TOKEN_LIVE));
+
+report(
+  "an active HM with nothing keyed in this month can still be opened, blank",
+  (
+    await asAnon(
+      `select public.resolve_share_hm_report('${TOKEN_LIVE}', '${shareHmIdle.id}') as body`,
+    )
+  ).rows[0].body !== null,
+);
+
+/** The HM resolver's answer for one (token, id) pair. */
+async function hmResolvesToNull(token, id, label) {
+  const row = (
+    await asAnon(
+      `select public.resolve_share_hm_report(${token}, ${id}) as body`,
+    )
+  ).rows[0];
+
+  report(label, row.body === null, JSON.stringify(row.body)?.slice(0, 120));
+}
+
+await hmResolvesToNull(
+  `'${TOKEN_LIVE}'`,
+  `'${shareHmGone.id}'`,
+  "an inactive HM with nothing this month cannot be opened from it",
+);
+await hmResolvesToNull(
+  `'${TOKEN_LIVE}'`,
+  `'${shareMonthA.id}'`,
+  "a month id used as an HM id resolves to nothing",
+);
+await hmResolvesToNull(
+  `'${TOKEN_LIVE}'`,
+  `'3f2504e0-4f89-11d3-9a0c-0305e82c3301'`,
+  "an HM id that matches nobody resolves to nothing",
+);
+await hmResolvesToNull(
+  `'${TOKEN_LIVE}'`,
+  `null`,
+  "a null HM id resolves to nothing",
+);
+await hmResolvesToNull(
+  `'${TOKEN_REVOKED}'`,
+  `'${shareHm.id}'`,
+  "a revoked token opens no HM",
+);
+await hmResolvesToNull(
+  `'${TOKEN_EXPIRED}'`,
+  `'${shareHm.id}'`,
+  "an expired token opens no HM",
+);
+await hmResolvesToNull(
+  `'${shareToken("never_issued_hm_")}'`,
+  `'${shareHm.id}'`,
+  "a token that was never issued opens no HM",
+);
+await hmResolvesToNull(
+  `'${shareMonthA.id}'`,
+  `'${shareHm.id}'`,
+  "a month id used as a token opens no HM",
+);
+await hmResolvesToNull(`''`, `'${shareHm.id}'`, "an empty token opens no HM");
+await hmResolvesToNull(`null`, `'${shareHm.id}'`, "a null token opens no HM");
+
+const aprilHm = (
+  await asAnon(
+    `select public.resolve_share_hm_report('${TOKEN_OTHER_MONTH}', '${shareHm.id}') as body`,
+  )
+).rows[0].body;
+
+report(
+  "a token bound to April opens April's figures, not March's",
+  aprilHm?.month?.label === "April 2027" &&
+    Number(aprilHm.monthly[0].net_units) === 999,
+  JSON.stringify(aprilHm?.month),
+);
+
+report(
+  "its context is March - the month before it - and still one HM only",
+  aprilHm.context.length === 1 &&
+    aprilHm.context[0].month.label === "March 2027" &&
+    aprilHm.context[0].monthly.every((row) => row.hm_id === shareHm.id),
+  JSON.stringify(aprilHm.context?.map((entry) => entry.month?.label)),
+);
+
+report(
+  "opening an HM stamps the same link's last_accessed_at",
+  (
+    await one(
+      `select last_accessed_at from public.share_links where token = '${TOKEN_OTHER_MONTH}'`,
+    )
+  ).last_accessed_at !== null,
+);
+
 // --- anon is still locked out of every table -------------------------------------
 async function anonBlockedFrom(relation) {
   await asSuperuser(`select 1`);
@@ -1611,9 +1842,16 @@ const anonFunctions = (
   )
 ).rows.map((r) => r.proname);
 
+// The two share resolvers, and nothing else. Both are token-gated, both are
+// SECURITY DEFINER, and both return NULL for every failure. Written as an exact
+// SET rather than a count: a third callable function reaching anon should fail
+// this test whatever it is called.
+const ANON_FUNCTIONS = ["resolve_share_hm_report", "resolve_share_report"];
+
 report(
-  `resolve_share_report is the ONLY callable function anon may execute (${anonFunctions.join(", ") || "none"})`,
-  anonFunctions.length === 1 && anonFunctions[0] === "resolve_share_report",
+  `the two share resolvers are the ONLY callable functions anon may execute (${anonFunctions.join(", ") || "none"})`,
+  anonFunctions.length === ANON_FUNCTIONS.length &&
+    ANON_FUNCTIONS.every((name, index) => anonFunctions[index] === name),
 );
 
 // --- a deactivated PA loses share-link access too ---------------------------------

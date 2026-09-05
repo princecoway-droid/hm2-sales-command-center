@@ -35,8 +35,20 @@ import path from "node:path";
 
 import { PGlite } from "@electric-sql/pglite";
 
-import { formatPercentage, formatUnits } from "@/lib/calculations";
-import { ROUTES, PUBLIC_ROUTES, isPublicRoute, sharePath } from "@/lib/routes";
+import {
+  formatPercentage,
+  formatUnits,
+  monthsRequiredFor,
+  type HmMonthlyRecord,
+  type HmWeeklyRecord,
+} from "@/lib/calculations";
+import {
+  ROUTES,
+  PUBLIC_ROUTES,
+  isPublicRoute,
+  shareHmPath,
+  sharePath,
+} from "@/lib/routes";
 import {
   SHARE_LINK_EXPIRY_DAYS,
   SHARE_TOKEN_LENGTH,
@@ -59,6 +71,11 @@ import {
 } from "@/lib/view-models/dashboard";
 import { buildShareReport, parseSharePayload } from "@/lib/share/resolve";
 import {
+  buildShareHmDetail,
+  parseShareHmPayload,
+  type ShareHmPayload,
+} from "@/lib/share/resolve-hm";
+import {
   applyRevokedLink,
   countShareLinks,
   isTokenRevoked,
@@ -70,20 +87,27 @@ import {
   resolveAppOrigin,
 } from "@/lib/share/url";
 import type { ShareLinkSummary } from "@/lib/data/share";
+import type { HM, Month, SalesWeek } from "@/types/models";
 import {
   buildPublicShareViewModel,
   type PublicShareViewModel,
 } from "@/lib/view-models/public-share";
 import {
+  buildHmPerformanceViewModel,
   buildMonthlyPerformanceViewModel,
   type MonthPerformanceRecords,
   type PerformanceBundle,
 } from "@/lib/view-models/monthly-performance";
 import {
+  buildHmDetailViewModel,
+  type HmDetailViewModel,
+} from "@/lib/view-models/hm-detail";
+import {
   FOUR_WEEKS,
   SEPTEMBER_WEEKS,
   buildMonthRecords,
   createRoster,
+  hmId,
   rosterList,
   type Roster,
 } from "./fixtures.mts";
@@ -1219,8 +1243,22 @@ section("[16] the public view model is a projection, and drops what it must");
 
   const serialised = JSON.stringify(publicView);
 
-  check("no hmId reaches the public model", !serialised.includes("hmId"));
+  // An HM card carries the id it opens, and that is the whole of what changed
+  // when the cards became clickable: the model still holds no URL, so it cannot
+  // point anywhere on its own, and the link is built by the page from the token
+  // it was opened with.
+  check(
+    "an HM card carries the id it opens",
+    publicView.hms.length > 0 &&
+      publicView.hms.every(
+        (hm) => typeof hm.hmId === "string" && hm.hmId.length > 0,
+      ),
+  );
   check("no href into the private app", !serialised.includes("href"));
+  check(
+    "and no capability on the model - the token never reaches it",
+    !serialised.includes("token") && !serialised.includes("/share/"),
+  );
   check("no month id", !serialised.includes(september.month.id));
   check(
     "no week ids",
@@ -1442,8 +1480,82 @@ section("[18] the public route is bound to its token and reads nothing else");
   const card = readCode("components/share/share-hm-card.tsx");
 
   check(
-    "the public HM card links nowhere - there is no public HM detail page",
-    !card.includes("next/link") && !card.includes("hmDetailPath"),
+    "the public HM card builds no URL of its own - it renders the one it is given",
+    !card.includes("hmDetailPath") &&
+      !card.includes("ROUTES.hmDetail") &&
+      !card.includes("shareHmPath") &&
+      !card.includes("@/lib/routes"),
+  );
+
+  check(
+    "and the report builds that link from the token, with no month parameter",
+    report.includes("shareHmPath(token, hm.hmId)") &&
+      !report.includes("hmDetailPath") &&
+      !report.includes("month="),
+  );
+
+  // Comments stripped: this file explains at length what it does NOT do, and
+  // several of the checks below are of the form "this string is absent".
+  const hmPage = readCode("app/share/[token]/hm/[hmId]/page.tsx");
+
+  check(
+    "the public HM page takes both the token and the HM from the path",
+    hmPage.includes("props.params") &&
+      hmPage.includes("token") &&
+      hmPage.includes("hmId"),
+  );
+
+  check(
+    "it reads NO search parameters either, so `?month=` cannot override it",
+    !hmPage.includes("searchParams"),
+  );
+
+  check(
+    "it resolves through the share data module and nothing else",
+    hmPage.includes("getPublicShareHmReport") &&
+      !hmPage.includes("getHmDetailData") &&
+      !hmPage.includes("getDashboardData") &&
+      !hmPage.includes("createSupabaseServerClient"),
+  );
+
+  check(
+    "no auth guard - this route deliberately has no session",
+    !hmPage.includes("requireAuth") && !hmPage.includes("requirePaOrManager"),
+  );
+
+  check(
+    "an unusable token or an unknown HM is the same generic 404",
+    hmPage.includes("notFound()"),
+  );
+
+  check(
+    "it is never cached, so a revoked link stops working at once",
+    hmPage.includes('dynamic = "force-dynamic"'),
+  );
+
+  check(
+    "it offers no month switcher and no way into Data Entry",
+    // `?month=` and not `month=`: the page passes `month={detail.month}` to
+    // the header, which is the month it is already showing, not a request for
+    // another one.
+    !hmPage.includes("MonthSwitcher") &&
+      !hmPage.includes("?month=") &&
+      !hmPage.includes("ROUTES.dataEntry"),
+  );
+
+  check(
+    "back goes to the report it was opened from, never to the dashboard",
+    hmPage.includes("sharePath(token)") &&
+      !hmPage.includes("dashboardPath") &&
+      !hmPage.includes("ROUTES.dashboard"),
+  );
+
+  check(
+    "and it renders the signed-in screen's own components",
+    ["HmDetailHeader", "HmPrimaryPerformance", "HmSecondaryKpis",
+     "HmWeeklyPerformance", "HmSalesMix", "HmComparison", "HmQtd"].every(
+      (component) => hmPage.includes(component),
+    ),
   );
 }
 
@@ -2071,10 +2183,11 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
     );
 
     check(
-      "and no real database id",
-      !serialised.includes(month.id) &&
-        !serialised.includes(alpha.id) &&
-        !serialised.includes(weekIds[0]!),
+      "and no month or week id from the real rows",
+      // The HM ids ARE there: a card opens that HM under the same token. What
+      // must not be here is anything that would let a viewer name a different
+      // month or reach a week directly.
+      !serialised.includes(month.id) && !serialised.includes(weekIds[0]!),
     );
 
     check(
@@ -2154,6 +2267,223 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
     "a figure corrected after the link was shared shows on that same link",
     updated !== null && publicKpi(updated, "net").value === formatUnits(138),
     updated ? publicKpi(updated, "net").value : "no report",
+  );
+
+  // ---------------------------------------------------------------------------
+  // The same token, one room further in: /share/<token>/hm/<hmId>
+  // ---------------------------------------------------------------------------
+  //
+  // The second RPC, across the same seam and against the same real Postgres.
+  // What is being proved here is what a fixture cannot: that the jsonb
+  // `resolve_share_hm_report` builds - including a `context` array of months
+  // narrowed to ONE HM - feeds the HM presenter and produces the figures the
+  // signed-in screen produces from the same tables.
+
+  const resolveHm = async (tokenValue: string, id: string) => {
+    await db.exec(`set role anon`);
+    const body = (
+      (await db.query(
+        `select public.resolve_share_hm_report('${tokenValue}', '${id}') as body`,
+      )) as { rows: { body: unknown }[] }
+    ).rows[0]!.body;
+    await db.exec(`reset role`);
+
+    return body;
+  };
+
+  // August, so month-over-month and the quarter have something real to work
+  // from - and Bravo's August row, which must NOT come back in Alpha's context.
+  const august = (await first(
+    `insert into public.months (year, month, label, quarter)
+       values (2026, 8, '', 3) returning id`,
+  )) as { id: string };
+
+  await db.exec(
+    `insert into public.hm_monthly_performance
+       (hm_id, month_id, net_units, target_net_units, recruitment, active_hp,
+        shi_percentage, extrade_units, non_extrade_units)
+     values
+       ('${alpha.id}', '${august.id}', 68, 95, 4, 30, 86.00, 18, 50),
+       ('${bravo.id}', '${august.id}', 60, 85, 2, 24, 90.00, 12, 48)`,
+  );
+
+  // An inactive HM with nothing recorded for the month. Not on the group
+  // report, so not openable from it either.
+  const echo = (await first(
+    `insert into public.hms (name, office, display_order, status)
+       values ('Sample HM Echo', 'Sample Office E', 5, 'inactive') returning id`,
+  )) as { id: string };
+
+  const hmBody = await resolveHm(replacement, alpha.id);
+
+  check("anon resolves an HM under a live token", hmBody !== null);
+
+  const hmPayload = parseShareHmPayload(hmBody);
+
+  check("the HM payload parses", hmPayload !== null);
+
+  if (hmPayload) {
+    check(
+      "it is the token's month, and no other",
+      hmPayload.month.id === month.id && hmPayload.hmId === alpha.id,
+    );
+
+    check(
+      "the context carries the previous month",
+      hmPayload.context.some((entry) => entry.month.id === august.id),
+      hmPayload.context.map((entry) => entry.month.label).join(", ") || "none",
+    );
+
+    check(
+      "and ONLY the requested HM's rows in it - never the roster's",
+      hmPayload.context.every((entry) =>
+        entry.monthly.every((row) => row.hm_id === alpha.id),
+      ) &&
+        hmPayload.context.every(
+          (entry) => !JSON.stringify(entry).includes(bravo.id),
+        ),
+    );
+
+    check(
+      "a context month carries no weeks and no weekly Key-In",
+      hmPayload.context.every((entry) => {
+        const keys = Object.keys(entry as unknown as Record<string, unknown>);
+
+        return (
+          keys.length === 2 && keys.includes("month") && keys.includes("monthly")
+        );
+      }),
+    );
+
+    const publicHm = buildShareHmDetail(hmPayload, {
+      backHref: sharePath(replacement),
+    });
+
+    check("and it builds an HM view", publicHm !== null);
+
+    // ---- the private screen, from the same database ------------------------
+    //
+    // Assembled the way `getDashboardData` assembles it: every month the HM
+    // screen needs, the WHOLE roster in each of them. If the public path's
+    // narrowing changed a figure, this equality is where it surfaces.
+    // The trailing comma is required in a .mts file: `<T>` alone would be read
+    // as the start of a JSX element.
+    const rowsOf = async <T,>(sql: string): Promise<T[]> =>
+      ((await db.query(sql)) as { rows: { row: T }[] }).rows.map((r) => r.row);
+
+    const allHms = await rowsOf<HM>(
+      `select to_jsonb(h) as row from public.hms h
+        order by h.display_order, h.name`,
+    );
+    const allMonths = await rowsOf<Month>(
+      `select to_jsonb(mo) as row from public.months mo`,
+    );
+    const allWeeks = await rowsOf<SalesWeek>(
+      `select to_jsonb(w) as row from public.sales_weeks w
+        order by w.week_number`,
+    );
+    const allMonthly = await rowsOf<HmMonthlyRecord & { month_id: string }>(
+      `select to_jsonb(p) as row from public.hm_monthly_performance p`,
+    );
+    const allWeekly = await rowsOf<HmWeeklyRecord>(
+      `select to_jsonb(k) as row from public.hm_weekly_performance k`,
+    );
+
+    const weekMonth = new Map(allWeeks.map((w) => [w.id, w.month_id] as const));
+
+    const wanted = monthsRequiredFor({ year: 2026, month: 9 });
+
+    const privateMonths = allMonths
+      .filter((mo) =>
+        wanted.some((w) => w.year === mo.year && w.month === mo.month),
+      )
+      .map((mo) => ({
+        month: mo,
+        weeks: allWeeks.filter((w) => w.month_id === mo.id),
+        monthly: allMonthly.filter((p) => p.month_id === mo.id),
+        weekly: allWeekly.filter((k) => weekMonth.get(k.week_id) === mo.id),
+      }));
+
+    const privateHmModel = buildHmPerformanceViewModel(
+      {
+        selectedMonthId: month.id,
+        hms: allHms,
+        months: privateMonths,
+        groupShiPct:
+          hmPayload.groupShiPct === null ? null : Number(hmPayload.groupShiPct),
+      },
+      alpha.id,
+    );
+
+    check("the private HM model builds from the same rows", privateHmModel !== null);
+
+    if (publicHm && privateHmModel) {
+      const privateHm = buildHmDetailViewModel({
+        selectedMonth: hmPayload.month,
+        model: privateHmModel,
+        lastUpdatedAt: hmPayload.lastUpdatedAt,
+      });
+
+      const withoutBack = (detail: HmDetailViewModel) =>
+        JSON.stringify({ ...detail, backHref: null });
+
+      check(
+        "the public HM view equals the private HM screen, across a real database",
+        withoutBack(publicHm) === withoutBack(privateHm),
+      );
+
+      check(
+        "the previous month is real, and it is August",
+        publicHm.previousMonthNet.hasPreviousMonth &&
+          publicHm.previousMonthNet.previousNetLabel === formatUnits(68),
+        publicHm.previousMonthNet.previousNetLabel,
+      );
+
+      check(
+        "the quarter counts July as missing rather than as zero",
+        !publicHm.qtd.isComplete &&
+          publicHm.qtd.netLabel === formatUnits(68 + 80),
+        `${publicHm.qtd.netLabel} / ${publicHm.qtd.incompleteMessage}`,
+      );
+
+      const serialisedHm = JSON.stringify(publicHm);
+
+      check(
+        "and it carries no audit column, and the token only in the link back",
+        !serialisedHm.includes("created_by") &&
+          !serialisedHm.includes("updated_by") &&
+          // The back link is the one place the token belongs: it is how the
+          // reader returns to the report they came from. Nowhere else.
+          !withoutBack(publicHm).includes(replacement),
+      );
+    }
+  }
+
+  // ---- the boundary, through the real function ------------------------------
+  check(
+    "a revoked token opens no HM",
+    (await resolveHm(token, alpha.id)) === null,
+  );
+
+  check(
+    "a month id is not an HM id",
+    (await resolveHm(replacement, month.id)) === null,
+  );
+
+  check(
+    "an HM who is not on this month's report cannot be opened from it",
+    (await resolveHm(replacement, echo.id)) === null,
+  );
+
+  check(
+    "an id that matches nobody resolves to nothing",
+    (await resolveHm(replacement, "3f2504e0-4f89-11d3-9a0c-0305e82c3301")) ===
+      null,
+  );
+
+  check(
+    "and a token that fails the shape gate never reaches a row",
+    (await resolveHm("short", alpha.id)) === null,
   );
 
   await db.close();
@@ -2723,6 +3053,349 @@ section("[25] the link list is state the panel owns, and it never goes stale");
     !model.includes("useState") &&
       !model.includes("supabase") &&
       !model.includes("fetch("),
+  );
+}
+
+// =============================================================================
+section("[26] the public HM view is the private HM screen, minus the session");
+// =============================================================================
+//
+// The one failure this feature cannot have: an HM card opened from a WhatsApp
+// link showing figures the manager's own screen would not. So the assertion is
+// an EQUALITY between the two models, built through both real paths from the
+// same records, and it is deliberately whole-object rather than field by field
+// - a figure added to the HM screen later is covered without anybody
+// remembering to add it here.
+//
+// The two paths differ in exactly one input, and it is the one the migration
+// exists for: the private bundle carries the previous month and the quarter for
+// the WHOLE roster, the public payload carries those months for ONE HM. If that
+// narrowing changed any figure on the screen, this section is where it shows.
+
+{
+  const roster = createRoster(["Alpha", "Bravo", "Charlie"]);
+  const target = hmId(roster, "Alpha");
+
+  const july = buildMonthRecords(roster, {
+    year: 2026,
+    month: 7,
+    hms: {
+      Alpha: { monthly: { net: 61, target: 90, recruitment: 3, activeHp: 28 } },
+      Bravo: { monthly: { net: 54, target: 80, recruitment: 1, activeHp: 22 } },
+    },
+  });
+
+  const august = buildMonthRecords(roster, {
+    year: 2026,
+    month: 8,
+    hms: {
+      Alpha: { monthly: { net: 68, target: 95, recruitment: 4, activeHp: 30 } },
+      Bravo: { monthly: { net: 60, target: 85, recruitment: 2, activeHp: 24 } },
+    },
+  });
+
+  const september = buildMonthRecords(roster, {
+    year: 2026,
+    month: 9,
+    hms: {
+      Alpha: {
+        monthly: {
+          net: 76,
+          target: 100,
+          recruitment: 6,
+          activeHp: 31,
+          shi: 88,
+          extrade: 20,
+          nonExtrade: 56,
+        },
+        weekly: [20, 18, 22, 16, null],
+      },
+      Bravo: {
+        monthly: { net: 71, target: 90, recruitment: 4, activeHp: 29 },
+        weekly: [18, 20, 17, 14, null],
+      },
+    },
+  });
+
+  const LAST_UPDATED = "2026-09-04T06:32:00Z";
+
+  // ---- the private screen, exactly as app/(app)/hm/[hmId]/page.tsx builds it
+  const privateModel = buildHmPerformanceViewModel(
+    {
+      selectedMonthId: september.month.id,
+      hms: rosterList(roster),
+      months: [july, august, september],
+      groupShiPct: 72,
+    },
+    target,
+  );
+
+  if (!privateModel) {
+    throw new Error("Fixture error: the private HM model could not be built.");
+  }
+
+  const privateDetail = buildHmDetailViewModel({
+    selectedMonth: september.month,
+    model: privateModel,
+    lastUpdatedAt: LAST_UPDATED,
+  });
+
+  // ---- the public view, from a payload shaped exactly as the RPC builds one
+  const payload: ShareHmPayload = {
+    hmId: target,
+    month: september.month,
+    weeks: september.weeks,
+    hms: rosterList(roster),
+    monthly: september.monthly,
+    weekly: september.weekly,
+    groupShiPct: 72,
+    lastUpdatedAt: LAST_UPDATED,
+    // ONE HM's rows for the context months. This is the narrowing the migration
+    // performs, reproduced here so the equality below is a real test of it.
+    context: [july, august].map((records) => ({
+      month: records.month,
+      monthly: records.monthly.filter((row) => row.hm_id === target),
+    })),
+  };
+
+  const TOKEN = generateShareToken();
+  const backHref = sharePath(TOKEN);
+
+  const publicDetail = buildShareHmDetail(payload, { backHref });
+
+  check("the payload builds a public HM view", publicDetail !== null);
+
+  if (publicDetail) {
+    const withoutBack = (detail: HmDetailViewModel) =>
+      JSON.stringify({ ...detail, backHref: null });
+
+    check(
+      "every figure on it equals the private HM screen's, whole model",
+      withoutBack(publicDetail) === withoutBack(privateDetail),
+    );
+
+    // Named individually as well, because a whole-object equality that breaks
+    // says only "something differs" - and these are the figures the feature was
+    // asked for by name.
+    const fields = [
+      ["Net", publicDetail.net.value, privateDetail.net.value],
+      ["Target", publicDetail.target.value, privateDetail.target.value],
+      [
+        "Achievement",
+        publicDetail.achievement.value,
+        privateDetail.achievement.value,
+      ],
+      ["Key-In", publicDetail.keyIn.value, privateDetail.keyIn.value],
+      ["Net ratio", publicDetail.netRatio.value, privateDetail.netRatio.value],
+      [
+        "Recruitment",
+        publicDetail.secondary[0]!.value,
+        privateDetail.secondary[0]!.value,
+      ],
+      [
+        "Active HP",
+        publicDetail.secondary[1]!.value,
+        privateDetail.secondary[1]!.value,
+      ],
+      ["SHI", publicDetail.secondary[2]!.value, privateDetail.secondary[2]!.value],
+      [
+        "Weekly Key-In total",
+        publicDetail.weekly.totalLabel,
+        privateDetail.weekly.totalLabel,
+      ],
+      [
+        "Extrade",
+        publicDetail.salesMix.extrade.unitsLabel,
+        privateDetail.salesMix.extrade.unitsLabel,
+      ],
+      [
+        "Extrade %",
+        publicDetail.salesMix.extrade.percentageLabel,
+        privateDetail.salesMix.extrade.percentageLabel,
+      ],
+      [
+        "Non-Extrade",
+        publicDetail.salesMix.nonExtrade.unitsLabel,
+        privateDetail.salesMix.nonExtrade.unitsLabel,
+      ],
+      [
+        "Non-Extrade %",
+        publicDetail.salesMix.nonExtrade.percentageLabel,
+        privateDetail.salesMix.nonExtrade.percentageLabel,
+      ],
+      [
+        "Previous month Net",
+        publicDetail.previousMonthNet.changeUnitsLabel,
+        privateDetail.previousMonthNet.changeUnitsLabel,
+      ],
+      [
+        "Previous month recruitment",
+        publicDetail.previousMonthRecruitment.changeUnitsLabel,
+        privateDetail.previousMonthRecruitment.changeUnitsLabel,
+      ],
+      ["QTD Net", publicDetail.qtd.netLabel, privateDetail.qtd.netLabel],
+      [
+        "QTD recruitment",
+        publicDetail.qtd.recruitmentLabel,
+        privateDetail.qtd.recruitmentLabel,
+      ],
+      [
+        "Rank",
+        publicDetail.hm.rankLabel ?? "",
+        privateDetail.hm.rankLabel ?? "",
+      ],
+      ["Month", publicDetail.month.label, privateDetail.month.label],
+      ["Office", publicDetail.hm.office, privateDetail.hm.office],
+      ["Name", publicDetail.hm.name, privateDetail.hm.name],
+    ] as const;
+
+    for (const [label, publicValue, privateValue] of fields) {
+      check(
+        `${label}: public = private (${publicValue})`,
+        publicValue === privateValue,
+        `public "${publicValue}" vs private "${privateValue}"`,
+      );
+    }
+
+    check(
+      "the previous month is a real comparison, not an empty one",
+      publicDetail.previousMonthNet.hasPreviousMonth &&
+        publicDetail.previousMonthNet.previousNetLabel === formatUnits(68),
+      publicDetail.previousMonthNet.previousNetLabel,
+    );
+
+    check(
+      "and the quarter counts all three of its months",
+      publicDetail.qtd.netLabel === formatUnits(61 + 68 + 76) &&
+        publicDetail.qtd.isComplete,
+      publicDetail.qtd.netLabel,
+    );
+
+    check(
+      "back goes to the report, never to the dashboard",
+      publicDetail.backHref === backHref &&
+        !publicDetail.backHref.includes(ROUTES.dashboard),
+      publicDetail.backHref,
+    );
+
+    check(
+      "and the view carries no PA-facing notice",
+      publicDetail.notice === null,
+    );
+  }
+
+  // ---- a quarter month that was never opened is named, never summed over ----
+  const withoutJuly = buildShareHmDetail(
+    {
+      ...payload,
+      context: payload.context.filter((entry) => entry.month.month !== 7),
+    },
+    { backHref },
+  );
+
+  check(
+    "a missing quarter month is reported as missing rather than as zero",
+    withoutJuly !== null &&
+      !withoutJuly.qtd.isComplete &&
+      withoutJuly.qtd.incompleteMessage !== null &&
+      withoutJuly.qtd.netLabel === formatUnits(68 + 76),
+    withoutJuly
+      ? `${withoutJuly.qtd.netLabel} / ${withoutJuly.qtd.incompleteMessage}`
+      : "none",
+  );
+
+  // ---- no context at all: honest blanks, never a fabricated comparison -----
+  const alone = buildShareHmDetail({ ...payload, context: [] }, { backHref });
+
+  check(
+    "with no context months there is no previous month to compare against",
+    alone !== null && !alone.previousMonthNet.hasPreviousMonth,
+  );
+
+  check(
+    "and this month's own figures are unaffected by the months around it",
+    alone !== null && alone.net.value === privateDetail.net.value,
+  );
+
+  // ---- an id the payload does not cover is "not found", not an empty page --
+  check(
+    "an HM who is not in the roster builds nothing",
+    buildShareHmDetail(
+      { ...payload, hmId: "3f2504e0-4f89-11d3-9a0c-0305e82c3301" },
+      { backHref },
+    ) === null,
+  );
+
+  // ---- parsing ------------------------------------------------------------
+  const rawPayload = {
+    hm_id: target,
+    month: september.month,
+    weeks: september.weeks,
+    hms: rosterList(roster),
+    monthly: september.monthly,
+    weekly: september.weekly,
+    group_shi_pct: "72.00",
+    last_updated_at: LAST_UPDATED,
+    context: [
+      {
+        month: august.month,
+        monthly: august.monthly.filter((row) => row.hm_id === target),
+      },
+    ],
+  };
+
+  const parsed = parseShareHmPayload(rawPayload);
+
+  check("a well-formed payload parses", parsed !== null);
+
+  check(
+    "a numeric arriving as a string is still a number downstream",
+    parsed !== null &&
+      buildShareHmDetail(parsed, { backHref })?.month.label ===
+        "September 2026",
+  );
+
+  check(
+    "no hm_id is no payload",
+    parseShareHmPayload({ ...rawPayload, hm_id: null }) === null,
+  );
+
+  check(
+    "no month is no payload",
+    parseShareHmPayload({ ...rawPayload, month: null }) === null,
+  );
+
+  check("null is no payload", parseShareHmPayload(null) === null);
+
+  check(
+    "a context entry without a month is dropped rather than half-built",
+    parseShareHmPayload({ ...rawPayload, context: [{ monthly: [] }] })?.context
+      .length === 0,
+  );
+
+  check(
+    "a context that is not a list is an empty one, never a crash",
+    parseShareHmPayload({ ...rawPayload, context: null })?.context.length === 0,
+  );
+
+  // ---- the route helper ---------------------------------------------------
+  check(
+    "shareHmPath nests the HM under the token",
+    shareHmPath("abc", "hm-1") === "/share/abc/hm/hm-1",
+    shareHmPath("abc", "hm-1"),
+  );
+
+  check(
+    "and carries no month parameter",
+    !shareHmPath("abc", "hm-1").includes("month"),
+  );
+
+  check("both segments are encoded", shareHmPath("a/b", "c/d").includes("%2F"));
+
+  check(
+    "the public HM route is public, and /hm/<id> still is not",
+    isPublicRoute(shareHmPath("abc", "hm-1")) &&
+      !isPublicRoute(`${ROUTES.hmDetail}/hm-1`),
   );
 }
 

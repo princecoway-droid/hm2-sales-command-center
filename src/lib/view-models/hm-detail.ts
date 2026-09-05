@@ -137,7 +137,10 @@ export type HmDetailMonthModel = {
 export type HmDetailViewModel = {
   hm: HmIdentityModel;
   month: HmDetailMonthModel;
-  /** Back to the dashboard, on the month being looked at. */
+  /**
+   * Where "back" goes: the dashboard on the month being looked at, or - behind
+   * a share token - the report the HM was opened from. See the presenter input.
+   */
   backHref: string;
   /** When the month's records were last written, or `null` if never. */
   updatedLabel: string | null;
@@ -348,6 +351,16 @@ export type HmDetailPresenterInput = {
   /** Latest `updated_at` across the month's records, or `null`. */
   lastUpdatedAt: string | null;
   notice?: DashboardNotice | null;
+  /**
+   * Where "back" goes. Defaults to the dashboard on the month being looked at.
+   *
+   * Overridden by exactly one caller: the read-only view behind a share token,
+   * which has to return to the report it was opened from rather than to a
+   * screen its viewer cannot reach. Passing it in rather than patching the
+   * model afterwards keeps the route into the private app out of a public
+   * page's model entirely, instead of merely unrendered.
+   */
+  backHref?: string;
 };
 
 export function buildHmDetailViewModel({
@@ -355,6 +368,7 @@ export function buildHmDetailViewModel({
   model,
   lastUpdatedAt,
   notice = null,
+  backHref,
 }: HmDetailPresenterInput): HmDetailViewModel {
   const hm = model.performance;
 
@@ -383,7 +397,7 @@ export function buildHmDetailViewModel({
       quarterLabel: quarterLabel(selectedMonth.quarter, selectedMonth.year),
     },
 
-    backHref: dashboardPath(monthParam(selectedMonth)),
+    backHref: backHref ?? dashboardPath(monthParam(selectedMonth)),
     updatedLabel: formatUpdatedAt(lastUpdatedAt),
     notice,
 

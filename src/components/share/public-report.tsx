@@ -5,6 +5,7 @@ import {
   STATUS_TEXT_CLASSES,
 } from "@/components/ui/status-styles";
 import { APP_NAME } from "@/lib/app";
+import { shareHmPath } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import type {
   PublicKpi,
@@ -35,7 +36,20 @@ import type {
  * and nothing that needs sideways scrolling. It grows to a comfortable reading
  * width and stops - a report is not improved by being 1400px wide.
  */
-export function PublicReport({ report }: { report: PublicShareViewModel }) {
+type PublicReportProps = {
+  report: PublicShareViewModel;
+  /**
+   * The token this report was opened with.
+   *
+   * Held only so an HM card can link to that HM under the SAME token. It is
+   * never shown, never put in a query string, and never used to fetch anything
+   * from here - the page above already resolved it once, and this component
+   * only needs it to keep a link inside the capability the viewer arrived with.
+   */
+  token: string;
+};
+
+export function PublicReport({ report, token }: PublicReportProps) {
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <ReportHeader report={report} />
@@ -48,7 +62,7 @@ export function PublicReport({ report }: { report: PublicShareViewModel }) {
         <div className="mt-5 space-y-5">
           <GroupPerformance report={report} />
           <ShareWeekly weekly={report.weekly} monthLabel={report.monthLabel} />
-          <HmPerformance report={report} />
+          <HmPerformance report={report} token={token} />
         </div>
       )}
 
@@ -221,7 +235,22 @@ function ShareKpi({ tile, emphasis }: { tile: PublicKpi; emphasis?: boolean }) {
 // HMs
 // -----------------------------------------------------------------------------
 
-function HmPerformance({ report }: { report: PublicShareViewModel }) {
+/**
+ * The ranked list, every card opening that HM's own read-only view.
+ *
+ * The link is built HERE, from the token the page was opened with, rather than
+ * being carried on the view model: the model is a projection that deliberately
+ * holds no capability, and building the URL at the last moment is what keeps it
+ * that way. It carries no `?month=` either - the token already decided the
+ * month, for the card and for the page it opens.
+ */
+function HmPerformance({
+  report,
+  token,
+}: {
+  report: PublicShareViewModel;
+  token: string;
+}) {
   return (
     <section aria-labelledby="share-hms" className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -239,7 +268,7 @@ function HmPerformance({ report }: { report: PublicShareViewModel }) {
         <ol className="space-y-2.5">
           {report.hms.map((hm) => (
             <li key={hm.key}>
-              <ShareHmCard hm={hm} />
+              <ShareHmCard hm={hm} href={shareHmPath(token, hm.hmId)} />
             </li>
           ))}
         </ol>

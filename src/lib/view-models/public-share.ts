@@ -25,7 +25,10 @@ import type { DashboardViewModel } from "@/lib/view-models/dashboard";
  * What this file DOES decide is what to leave out, and that is the other half
  * of its job. Dropped on the way through:
  *
- *   hmId, href            internal ids and links into the private app
+ *   href                  links into the private app. An HM card DOES carry
+ *                         its `hmId`, because it opens that HM's read-only view
+ *                         under the same token - but the URL is built by the
+ *                         page, from the token, never here
  *   monthOverMonth, qtd   other months - the token is bound to exactly one
  *   month.id, month.param anything that would let a viewer name a month
  *   notice                messages written for the PA, about the PA's tools
@@ -64,6 +67,15 @@ export type PublicWeek = {
 
 export type PublicHmCard = {
   key: string;
+  /**
+   * The HM this card is about, so it can open their read-only view under the
+   * same token.
+   *
+   * Carried and not dropped, unlike `href`: the link is built by the page from
+   * the token it holds, so this model stays free of the capability and cannot
+   * be rendered into a URL by anything that does not already have one.
+   */
+  hmId: string;
   rank: number;
   name: string;
   office: string;
@@ -171,11 +183,12 @@ export function buildPublicShareViewModel(
       totalLabel: dashboard.weekly.totalLabel,
     },
 
-    // In the engine's ranked order, and NOT re-sorted. `hmId` and `href` are
-    // dropped: the rank is the key, and there is no public HM detail page for a
-    // link to point at.
+    // In the engine's ranked order, and NOT re-sorted. `href` is still dropped:
+    // it points into the private app, and the public card's own link is built
+    // from the token by the page that holds one.
     hms: dashboard.hms.map((hm) => ({
       key: `rank-${hm.rank}`,
+      hmId: hm.hmId,
       rank: hm.rank,
       name: hm.name,
       office: hm.office,

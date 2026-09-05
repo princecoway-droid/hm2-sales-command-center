@@ -9,6 +9,16 @@ type HmDetailHeaderProps = {
   hm: HmDetailViewModel["hm"];
   month: HmDetailViewModel["month"];
   backHref: string;
+  /**
+   * What the back link says. Defaults to the dashboard, which is where this
+   * screen is reached from inside the application.
+   *
+   * Overridden by the read-only view behind a share token, where "Back to HM2
+   * Dashboard" would name a screen the reader cannot open and has never seen.
+   * The label travels with the href for that reason: the two are one statement,
+   * and a link whose words and destination disagree is worse than no link.
+   */
+  backLabel?: string;
   updatedLabel: string | null;
   /** The month switcher, so the screen can be moved through the year. */
   controls?: ReactNode;
@@ -34,6 +44,7 @@ export function HmDetailHeader({
   hm,
   month,
   backHref,
+  backLabel = "Back to HM2 Dashboard",
   updatedLabel,
   controls,
 }: HmDetailHeaderProps) {
@@ -44,7 +55,7 @@ export function HmDetailHeader({
         className="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-sky-700 hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
       >
         <span aria-hidden>←</span>
-        Back to HM2 Dashboard
+        {backLabel}
       </Link>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">

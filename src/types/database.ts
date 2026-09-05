@@ -358,16 +358,30 @@ export type Database = {
         Returns: boolean;
       };
       /**
-       * The only function `anon` may execute.
+       * One of the two functions `anon` may execute.
        *
        * Returns one reporting month of public-safe records for a valid, active,
        * unexpired token, or `null` for every failure - so a caller cannot tell
        * "no such token" from "revoked" from "expired". Typed as `Json` because
        * it is a projection built in SQL rather than a table row; the shape it
-       * actually returns is parsed and narrowed in `lib/data/share.ts`.
+       * actually returns is parsed and narrowed in `lib/share/resolve.ts`.
        */
       resolve_share_report: {
         Args: { p_token: string };
+        Returns: Json;
+      };
+      /**
+       * The other one: the same token, narrowed to one HM.
+       *
+       * Returns the token's month exactly as `resolve_share_report` does, plus
+       * that ONE HM's monthly figures for the previous month and the earlier
+       * months of the quarter - enough for month-over-month and QTD, and never
+       * enough for a second group report. `null` for every failure, including
+       * an HM the token's month is not about. Narrowed in
+       * `lib/share/resolve-hm.ts`.
+       */
+      resolve_share_hm_report: {
+        Args: { p_token: string; p_hm_id: string };
         Returns: Json;
       };
     };

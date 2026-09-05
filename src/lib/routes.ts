@@ -35,8 +35,9 @@ export const ROUTES = {
    * arrangement of props under which the authenticated shell could render for
    * an anonymous visitor.
    *
-   * There is deliberately no public equivalent of `/hm/<id>`. The link posted
-   * to the group is one group report; individual HM screens stay behind login.
+   * An HM opened from that report lives UNDER the token, at
+   * `/share/<token>/hm/<hmId>`, and never at `/hm/<id>`: the token is still the
+   * whole of the authorization, and the private HM screen stays behind login.
    */
   share: "/share",
 } as const;
@@ -130,6 +131,23 @@ export function dashboardPath(month?: string | null): string {
  */
 export function sharePath(token: string): string {
   return `${ROUTES.share}/${encodeURIComponent(token)}`;
+}
+
+/**
+ * `/share/<token>/hm/<hmId>`.
+ *
+ * One HM, read-only, under the token that already authorizes the report they
+ * were opened from. Nested rather than a sibling for a reason that is the whole
+ * of the design: the token stays in the path, so the public HM view is reached
+ * by holding a live link and by nothing else, and revoking that link closes
+ * both pages in the same instant.
+ *
+ * No `?month=`, exactly like `sharePath`. The month is the token's, decided
+ * when the link was created, and a second answer to "which month is this" in
+ * the query string is what would turn a report into a database browser.
+ */
+export function shareHmPath(token: string, hmId: string): string {
+  return `${sharePath(token)}/hm/${encodeURIComponent(hmId)}`;
 }
 
 /** `/hm/<id>?month=2026-09`. The month is carried, never re-derived. */
