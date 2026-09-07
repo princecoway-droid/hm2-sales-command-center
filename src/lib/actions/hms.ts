@@ -33,15 +33,25 @@ import { HM_STATUSES, type HMStatus } from "@/types/models";
  * from `auth.uid()`, and a client-supplied value would be overwritten anyway.
  */
 
-/** Both HM screens read this data, so both are refreshed after a write. */
+/**
+ * Every screen that names an HM is refreshed after a write.
+ *
+ * The dashboard and the HP listing are in the list because of the HM Code: it
+ * is shown on the HM cards and on every HP row, and the Stage 8 import matches
+ * on it, so an edit that left either page showing the old code would be an edit
+ * the PA could not trust.
+ */
 function revalidateHmSurfaces(): void {
   revalidatePath(ROUTES.hmManagement);
   revalidatePath(ROUTES.dataEntry);
+  revalidatePath(ROUTES.dashboard);
+  revalidatePath(ROUTES.hpListing);
 }
 
 function readHmForm(formData: FormData) {
   return {
     name: formData.get("name"),
+    hm_code: formData.get("hm_code"),
     office: formData.get("office"),
     status: formData.get("status") ?? "active",
     display_order: formData.get("display_order") || 0,
@@ -64,13 +74,13 @@ export async function createHmAction(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { name, office, status, display_order } = parsed.data;
+  const { name, hm_code, office, status, display_order } = parsed.data;
 
   // photo_url is deliberately not settable here: a photo is uploaded against an
   // existing HM id, so it arrives through setHmPhotoAction once the row exists.
   const { error } = await supabase
     .from("hms")
-    .insert({ name, office, status, display_order });
+    .insert({ name, hm_code, office, status, display_order });
 
   if (error) {
     const mapped = mapDatabaseError(error);
@@ -104,11 +114,11 @@ export async function updateHmAction(
   }
 
   const supabase = await createSupabaseServerClient();
-  const { name, office, status, display_order } = parsed.data;
+  const { name, hm_code, office, status, display_order } = parsed.data;
 
   const { data, error } = await supabase
     .from("hms")
-    .update({ name, office, status, display_order })
+    .update({ name, hm_code, office, status, display_order })
     .eq("id", id.data)
     .select("id");
 

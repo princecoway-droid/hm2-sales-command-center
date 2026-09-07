@@ -1359,9 +1359,15 @@ section("[18] the dashboard fetch stays a fixed number of queries");
   const selects = source.match(/\.from\(/g) ?? [];
 
   check(
-    "six queries: months, hms, weeks, monthly, group SHI, weekly Key-In",
-    selects.length === 6,
+    "seven queries: months, hms, weeks, monthly, group SHI, Active HP, weekly Key-In",
+    selects.length === 7,
     `found ${selects.length}`,
+  );
+
+  check(
+    "Active HP is COUNTED in the database, not fetched HP by HP",
+    source.includes('.from("hm_monthly_hp_summary")') &&
+      !source.includes('.from("hp_monthly_performance")'),
   );
 
   check(
@@ -1377,7 +1383,8 @@ section("[18] the dashboard fetch stays a fixed number of queries");
 
   check(
     "the freshness stamp is scoped to the selected month",
-    source.includes("latestUpdate(selectedMonth.id"),
+    source.includes("latestUpdate(") &&
+      source.includes("      selectedMonth.id,"),
   );
 }
 

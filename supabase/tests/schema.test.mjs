@@ -100,16 +100,57 @@ const expectedTables = [
   "hm_weekly_performance",
   "group_monthly_metrics",
   "share_links",
+  "hps",
+  "hp_monthly_performance",
+  "hp_import_runs",
 ];
 const tables = (
   await db.query(
-    `select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
+    `select table_name from information_schema.tables
+      where table_schema = 'public' and table_type = 'BASE TABLE'
+      order by table_name`,
   )
 ).rows.map((r) => r.table_name);
 report(
   `all ${expectedTables.length} tables created (${tables.join(", ")})`,
   expectedTables.every((t) => tables.includes(t)) &&
     tables.length === expectedTables.length,
+);
+
+// Views are listed separately, and the list is exact: a view is the one thing
+// in this schema that can quietly read as its OWNER rather than as the caller,
+// so a new one appearing here without the security_invoker check below noticing
+// would be a hole through every policy underneath it.
+const expectedViews = ["hm_monthly_hp_summary", "hp_monthly_report"];
+const views = (
+  await db.query(
+    `select table_name from information_schema.views
+      where table_schema = 'public' order by table_name`,
+  )
+).rows.map((r) => r.table_name);
+report(
+  `views created (${views.join(", ")})`,
+  expectedViews.every((v) => views.includes(v)) &&
+    views.length === expectedViews.length,
+);
+
+const invokerViews = (
+  await db.query(
+    `select c.relname
+       from pg_class c
+      where c.relnamespace = 'public'::regnamespace
+        and c.relkind = 'v'
+        and coalesce(
+              (select option_value = 'true'
+                 from pg_options_to_table(c.reloptions)
+                where option_name = 'security_invoker'),
+              false)`,
+  )
+).rows.map((r) => r.relname);
+report(
+  "every view is security_invoker, so RLS applies to the caller",
+  expectedViews.every((v) => invokerViews.includes(v)),
+  `invoker views: ${invokerViews.join(", ") || "none"}`,
 );
 
 const rlsOff = (
@@ -1657,7 +1698,14 @@ report(
   hmResolved.context.every((entry) => {
     const keys = Object.keys(entry).sort();
 
-    return keys.length === 2 && keys[0] === "month" && keys[1] === "monthly";
+    // month, monthly, hp_active. The HP entry is an AGGREGATE COUNT for this
+    // one HM - never an HP record, and never another HM's.
+    return (
+      keys.length === 3 &&
+      keys[0] === "hp_active" &&
+      keys[1] === "month" &&
+      keys[2] === "monthly"
+    );
   }),
 );
 

@@ -17,7 +17,12 @@ import { Alert } from "@/components/ui/alert";
 import { hasRole, requirePaOrManager } from "@/lib/auth/session";
 import { monthParam, parseMonthParam, type MonthResolution } from "@/lib/calendar";
 import { getHmDetailData } from "@/lib/data/hm-detail";
-import { dashboardPath, hmDetailPath, ROUTES } from "@/lib/routes";
+import {
+  dashboardPath,
+  hmDetailPath,
+  hpListingPath,
+  ROUTES,
+} from "@/lib/routes";
 import { formatMonthLabel } from "@/lib/validation/month";
 import type { DashboardNotice } from "@/lib/view-models/dashboard";
 import { buildHmDetailViewModel } from "@/lib/view-models/hm-detail";
@@ -129,6 +134,14 @@ export default async function HmDetailPage(
     model,
     lastUpdatedAt,
     notice: noticeFor(resolution, currentMonthLabel),
+    // This HM's active HPs for the month on screen. Built here, where the route
+    // table lives, so the presenter stays free of URL construction - and so the
+    // public view of the same model simply has none.
+    hpListingHref: hpListingPath({
+      month: monthParam(selectedMonth),
+      hmId: hm.id,
+      activeOnly: true,
+    }),
   });
 
   return (

@@ -293,7 +293,6 @@ export type CompletenessRow = {
   net_units: Entry;
   target_net_units: Entry;
   recruitment: Entry;
-  active_hp: Entry;
   shi_percentage: Entry;
   extrade_units: Entry;
   non_extrade_units: Entry;
@@ -310,7 +309,6 @@ export function hasRecordedData(row: CompletenessRow): boolean {
     row.net_units,
     row.target_net_units,
     row.recruitment,
-    row.active_hp,
     row.shi_percentage,
     row.extrade_units,
     row.non_extrade_units,

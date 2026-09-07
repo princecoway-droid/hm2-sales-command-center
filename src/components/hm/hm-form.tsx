@@ -69,6 +69,20 @@ export function HmForm({ hm, onSaved, onCancel }: HmFormProps) {
         error={fieldError(state, "name")}
       />
 
+      {/* Required, unique, and validated before save. It is not a label - it is
+          the key the Stage 8 Excel import matches every HP row on, so an HM
+          whose code is wrong is an HM the import cannot find. */}
+      <Field
+        label="HM Code"
+        name="hm_code"
+        defaultValue={hm?.hm_code ?? ""}
+        autoComplete="off"
+        required
+        className="font-mono uppercase"
+        hint="Coway's own identifier, e.g. HM10321. Used to match the HP Excel to this HM."
+        error={fieldError(state, "hm_code")}
+      />
+
       <Field
         label="Office"
         name="office"

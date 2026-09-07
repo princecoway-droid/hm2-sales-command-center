@@ -15,7 +15,7 @@ import {
   monthLabel,
   monthParam,
 } from "@/lib/calendar";
-import { hmDetailPath } from "@/lib/routes";
+import { hmDetailPath, hpListingPath } from "@/lib/routes";
 import { formatMonthLabel } from "@/lib/validation/month";
 import type { MonthlyPerformanceViewModel } from "@/lib/view-models/monthly-performance";
 import type { Month } from "@/types/models";
@@ -65,6 +65,15 @@ export type KpiKey =
 export type KpiTile = {
   key: KpiKey;
   label: string;
+  /**
+   * Where the figure came from, when there is somewhere to look.
+   *
+   * Only Active HP has one today: it is a COUNT of rows the manager can go and
+   * read, and "96 active" invites "which 96". Built here rather than in the
+   * card so the link always carries the month that produced the number - a
+   * figure that opened a different month's list would be worse than no link.
+   */
+  href?: string | null;
   /** Already formatted, blanks included. A component renders it as-is. */
   value: string;
   /**
@@ -124,6 +133,8 @@ export type WeeklyChartModel = {
 export type HmCardModel = {
   rank: number;
   hmId: string;
+  /** The Coway identifier, shown under the name. Secondary, never hidden. */
+  hmCode: string;
   /**
    * The HM's own screen, with the reporting month carried across.
    *
@@ -141,6 +152,15 @@ export type HmCardModel = {
   recruitmentLabel: string;
   recruitmentStatus: PerformanceStatus;
   activeHpLabel: string;
+  /**
+   * That HM's active HPs for this month, or `null` when there is no figure.
+   *
+   * The card's Active HP number is a link because the question it provokes -
+   * "which of my HPs are those?" - has an answer one click away. Built here so
+   * it carries the HM and the month together; a link that dropped either would
+   * open a list that does not match the number that was clicked.
+   */
+  activeHpHref: string | null;
   targetLabel: string;
   achievementLabel: string;
   progressPct: number | null;
@@ -251,7 +271,10 @@ function unitFor(value: string): string | null {
   return value === NO_VALUE ? null : "units";
 }
 
-function buildKpis(group: GroupMonthlyCalculatedPerformance): KpiTile[] {
+function buildKpis(
+  group: GroupMonthlyCalculatedPerformance,
+  monthParam: string,
+): KpiTile[] {
   const { contributors } = group;
   const anyWeekEntered = group.weeklyGroupKeyIn.some((week) => week.isEntered);
 
@@ -303,7 +326,19 @@ function buildKpis(group: GroupMonthlyCalculatedPerformance): KpiTile[] {
       label: "Active HP",
       value: totalLabel(group.totalActiveHp, contributors.activeHp),
       unit: null,
-      note: "From eTrust",
+      // Counted, not keyed: HPs whose Total Key-In for the month is at least 1.
+      // Blank rather than 0 when no HP file has been imported, because nobody
+      // has said anything about this month's HPs yet.
+      note:
+        contributors.activeHp === 0
+          ? "No HP data imported"
+          : "HPs with Key-In this month",
+      // Linked only when there is a figure. A link to an empty list is a
+      // promise the page cannot keep.
+      href:
+        contributors.activeHp === 0
+          ? null
+          : hpListingPath({ month: monthParam, activeOnly: true }),
     },
     {
       key: "netRatio",
@@ -394,6 +429,7 @@ function buildHmCards(
     return {
       rank: entry.rank,
       hmId: hm.hmId,
+      hmCode: hm.hmCode,
       href: hmDetailPath(hm.hmId, month),
       name: hm.hmName,
       office: hm.office,
@@ -406,6 +442,14 @@ function buildHmCards(
         hm.recruitment === null ? NO_VALUE : formatUnits(hm.recruitment),
       recruitmentStatus: hm.recruitmentStatus,
       activeHpLabel: hm.activeHp === null ? NO_VALUE : formatUnits(hm.activeHp),
+      activeHpHref:
+        hm.activeHp === null
+          ? null
+          : hpListingPath({
+              month,
+              hmId: hm.hmId,
+              activeOnly: true,
+            }),
       targetLabel:
         hm.targetNetUnits === null ? NO_VALUE : formatUnits(hm.targetNetUnits),
       achievementLabel: formatPercentage(hm.achievementPct, {
@@ -560,7 +604,7 @@ export function buildDashboardViewModel({
     updatedLabel: formatUpdatedAt(lastUpdatedAt),
     notice,
     hasAnyData: group.hasAnyData,
-    kpis: buildKpis(group),
+    kpis: buildKpis(group, param),
     target: buildTarget(group),
     weekly: buildWeekly(group),
     hms: buildHmCards(performance, param),

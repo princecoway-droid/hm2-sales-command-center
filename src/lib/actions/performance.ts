@@ -168,11 +168,17 @@ export async function saveMonthPerformanceAction(
   const monthlyUpserts: HMMonthlyPerformanceInsert[] = [];
 
   for (const row of rows) {
+    // `active_hp` is deliberately absent from this object. The column still
+    // exists and still holds whatever was keyed in before Stage 8, and leaving
+    // it out of the upsert is what preserves those figures: PostgREST builds
+    // its ON CONFLICT DO UPDATE SET list from the keys present here, so a
+    // column nobody sends is neither overwritten on an update nor invented on
+    // an insert. Active HP is counted from the HP import now - see
+    // `hm_monthly_hp_summary`.
     const values = {
       net_units: row.net_units ?? 0,
       target_net_units: row.target_net_units ?? 0,
       recruitment: row.recruitment ?? 0,
-      active_hp: row.active_hp ?? 0,
       shi_percentage: row.shi_percentage ?? 0,
       extrade_units: row.extrade_units ?? 0,
       non_extrade_units: row.non_extrade_units ?? 0,

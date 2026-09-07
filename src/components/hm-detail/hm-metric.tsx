@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
   STATUS_DOT_CLASSES,
   STATUS_TEXT_CLASSES,
@@ -31,14 +33,18 @@ const VALUE_SIZES = {
  *
  * The note line is always rendered - blank when there is nothing to say - so a
  * row of these keeps one height and the grid does not step as figures arrive.
+ *
+ * A metric that carries an `href` becomes a link over the whole tile: today
+ * that is Active HP, which is a COUNT of rows the manager can go and read. The
+ * link wraps the tile rather than the number so the touch target is the tile,
+ * and its accessible name is the label and the value together - "Active HP, 18"
+ * - rather than a bare number.
  */
 export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
   const showStatus = metric.status !== null && metric.status !== "neutral";
 
-  return (
-    // `min-w-0` matters: a grid item sizes to its content by default, so
-    // without it a long figure pushes the tile wider than its column.
-    <div className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
+  const body = (
+    <>
       <p className="truncate text-[11px] font-medium uppercase tracking-wider text-slate-500">
         {metric.label}
       </p>
@@ -84,6 +90,29 @@ export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
           <span>{metric.note ?? " "}</span>
         )}
       </p>
-    </div>
+    </>
+  );
+
+  // `min-w-0` matters on both branches: a grid item sizes to its content by
+  // default, so without it a long figure pushes the tile wider than its column.
+  const shell =
+    "flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm";
+
+  if (!metric.href) {
+    return <div className={shell}>{body}</div>;
+  }
+
+  return (
+    <Link
+      href={metric.href}
+      aria-label={`${metric.label}, ${metric.value} - open the HP list`}
+      className={cn(
+        shell,
+        "transition-colors hover:border-sky-300 hover:bg-sky-50/40",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600",
+      )}
+    >
+      {body}
+    </Link>
   );
 }

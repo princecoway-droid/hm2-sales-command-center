@@ -75,7 +75,6 @@ const gridRowFields = {
   net_units: naturalEntry("Net units"),
   target_net_units: naturalEntry("Target"),
   recruitment: naturalEntry("Recruitment"),
-  active_hp: naturalEntry("Active HP"),
   /** Keyed in from Coway eTrust. Never calculated, never averaged. */
   shi_percentage: percentageEntry("SHI"),
   extrade_units: naturalEntry("Extrade units"),

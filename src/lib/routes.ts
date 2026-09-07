@@ -24,6 +24,15 @@ export const ROUTES = {
    */
   hmDetail: "/hm",
   dataEntry: "/data-entry",
+  /**
+   * The PA's Excel upload. A sibling of Data Entry rather than a tab inside it:
+   * one is a spreadsheet the PA types into, the other replaces typing
+   * altogether, and they are scoped to different things - Data Entry to the HM
+   * roster, this to whatever the file contains.
+   */
+  hpImport: "/hp-import",
+  /** The HP listing. Read-only, and never reachable without a session. */
+  hpListing: "/hp",
   hmManagement: "/hm-management",
   settings: "/settings",
   /**
@@ -92,6 +101,13 @@ export const NAV_ITEMS: readonly NavItem[] = [
     roles: ["manager", "pa"],
   },
   {
+    href: ROUTES.hpListing,
+    label: "HP",
+    description: "HP performance for the month, and the Excel import",
+    roles: ["manager", "pa"],
+    matches: [ROUTES.hpImport],
+  },
+  {
     href: ROUTES.hmManagement,
     label: "HM Management",
     description: "The HM master list and photos",
@@ -148,6 +164,53 @@ export function sharePath(token: string): string {
  */
 export function shareHmPath(token: string, hmId: string): string {
   return `${sharePath(token)}/hm/${encodeURIComponent(hmId)}`;
+}
+
+/**
+ * `/hp?month=2026-09&hm=<id>&active=1`.
+ *
+ * Built in one place because it is a LINK TARGET as much as a route: the
+ * dashboard's Active HP figure and every HM card's Active HP figure open this
+ * page already filtered, and a caller that forgot `active` or `month` would
+ * land the manager on a different number from the one they clicked.
+ */
+export function hpListingPath(options: {
+  month?: string | null;
+  hmId?: string | null;
+  activeOnly?: boolean;
+  search?: string | null;
+  page?: number;
+} = {}): string {
+  const params = new URLSearchParams();
+
+  if (options.month) {
+    params.set("month", options.month);
+  }
+
+  if (options.hmId) {
+    params.set("hm", options.hmId);
+  }
+
+  if (options.activeOnly) {
+    params.set("active", "1");
+  }
+
+  if (options.search) {
+    params.set("q", options.search);
+  }
+
+  if (options.page && options.page > 1) {
+    params.set("page", String(options.page));
+  }
+
+  const query = params.toString();
+
+  return query ? `${ROUTES.hpListing}?${query}` : ROUTES.hpListing;
+}
+
+/** `/hp-import?month=2026-09`. */
+export function hpImportPath(month?: string | null): string {
+  return month ? `${ROUTES.hpImport}?month=${month}` : ROUTES.hpImport;
 }
 
 /** `/hm/<id>?month=2026-09`. The month is carried, never re-derived. */

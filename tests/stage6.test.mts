@@ -41,6 +41,7 @@ import {
   monthsRequiredFor,
   type HmMonthlyRecord,
   type HmWeeklyRecord,
+  type HpActiveRecord,
 } from "@/lib/calculations";
 import {
   ROUTES,
@@ -1960,6 +1961,37 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
        ('${bravo.id}', '${month.id}', 58, 80, 2, 25, 92.00, 10, 48)`,
   );
 
+  // The HP rows Active HP is now COUNTED from. Alpha: 34 HPs, 31 of them with
+  // Key-In. Bravo: 27 HPs, 25 active. So the group's Active HP is 56 - the same
+  // figure the pre-Stage-8 fixture keyed in by hand, arrived at the new way, so
+  // every assertion about it downstream is testing the derivation rather than a
+  // rewritten expectation.
+  for (const [hm, prefix, total, active] of [
+    [alpha.id, "ALPHA", 34, 31],
+    [bravo.id, "BRAVO", 27, 25],
+  ] as const) {
+    await db.exec(
+      `with new_hps as (
+         insert into public.hps (hp_code, hp_name, hm_id)
+         select '${prefix}' || lpad(n::text, 4, '0'),
+                'Sample HP ${prefix} ' || n,
+                '${hm}'
+           from generate_series(1, ${total}) as n
+         returning id, hp_code
+       )
+       insert into public.hp_monthly_performance
+         (month_id, hp_id, hm_id, w1_key_in, w2_key_in, total_key_in, total_net)
+       select '${month.id}',
+              nh.id,
+              '${hm}',
+              case when substring(nh.hp_code from 6)::int <= ${active} then 2 else 0 end,
+              case when substring(nh.hp_code from 6)::int <= ${active} then 1 else 0 end,
+              case when substring(nh.hp_code from 6)::int <= ${active} then 3 else 0 end,
+              case when substring(nh.hp_code from 6)::int <= ${active} then 2 else 0 end
+         from new_hps nh`,
+    );
+  }
+
   // W1-W4 keyed in for both; W5 left blank on purpose - the month is not over.
   const keyIn = [
     [alpha.id, [20, 18, 22, 16]],
@@ -2018,6 +2050,7 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
           weeks: payload.weeks,
           monthly: payload.monthly,
           weekly: payload.weekly,
+          hpActive: payload.hpActive,
         },
       ],
       groupShiPct: Number(payload.groupShiPct),
@@ -2349,8 +2382,14 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
       hmPayload.context.every((entry) => {
         const keys = Object.keys(entry as unknown as Record<string, unknown>);
 
+        // The month, that HM's monthly figures, and that HM's Active HP count.
+        // Nothing else: no weeks, no weekly Key-In, no group SHI, and no HP
+        // record - only the aggregate.
         return (
-          keys.length === 2 && keys.includes("month") && keys.includes("monthly")
+          keys.length === 3 &&
+          keys.includes("month") &&
+          keys.includes("monthly") &&
+          keys.includes("hpActive")
         );
       }),
     );
@@ -2388,6 +2427,12 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
     const allWeekly = await rowsOf<HmWeeklyRecord>(
       `select to_jsonb(k) as row from public.hm_weekly_performance k`,
     );
+    // Active HP the way the signed-in dashboard reads it: off the database's
+    // own summary view, not off the share payload. That is what makes the
+    // equality below a real comparison of two routes to the same figure.
+    const allHpActive = await rowsOf<HpActiveRecord & { month_id: string }>(
+      `select to_jsonb(sy) as row from public.hm_monthly_hp_summary sy`,
+    );
 
     const weekMonth = new Map(allWeeks.map((w) => [w.id, w.month_id] as const));
 
@@ -2402,6 +2447,7 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
         weeks: allWeeks.filter((w) => w.month_id === mo.id),
         monthly: allMonthly.filter((p) => p.month_id === mo.id),
         weekly: allWeekly.filter((k) => weekMonth.get(k.week_id) === mo.id),
+        hpActive: allHpActive.filter((sy) => sy.month_id === mo.id),
       }));
 
     const privateHmModel = buildHmPerformanceViewModel(
@@ -2427,9 +2473,36 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
       const withoutBack = (detail: HmDetailViewModel) =>
         JSON.stringify({ ...detail, backHref: null });
 
+      /**
+       * The two views, reduced to the parts that must be identical.
+       *
+       * Stage 8 gave the private screen two things the public one deliberately
+       * does not get: the HM Code, and a link into `/hp` that a token holder
+       * cannot open. Those are the ONLY differences allowed, so they are
+       * normalised away here and asserted separately below - rather than the
+       * comparison being loosened to "mostly equal".
+       */
+      const comparable = (detail: HmDetailViewModel) =>
+        withoutBack({
+          ...detail,
+          hm: { ...detail.hm, hmCode: null },
+          secondary: detail.secondary.map((metric) => ({
+            ...metric,
+            href: null,
+          })),
+        });
+
       check(
-        "the public HM view equals the private HM screen, across a real database",
-        withoutBack(publicHm) === withoutBack(privateHm),
+        "every figure on the public HM view equals the private HM screen's, across a real database",
+        comparable(publicHm) === comparable(privateHm),
+      );
+
+      check(
+        "and the ONLY things it does not carry are the HM Code and the private HP link",
+        privateHm.hm.hmCode !== null &&
+          publicHm.hm.hmCode === null &&
+          publicHm.secondary.every((metric) => !metric.href),
+        `private ${privateHm.hm.hmCode}, public ${publicHm.hm.hmCode}`,
       );
 
       check(
@@ -3148,13 +3221,16 @@ section("[26] the public HM view is the private HM screen, minus the session");
     hms: rosterList(roster),
     monthly: september.monthly,
     weekly: september.weekly,
+    hpActive: september.hpActive ?? [],
     groupShiPct: 72,
     lastUpdatedAt: LAST_UPDATED,
     // ONE HM's rows for the context months. This is the narrowing the migration
-    // performs, reproduced here so the equality below is a real test of it.
+    // performs, reproduced here so the equality below is a real test of it -
+    // including the Active HP aggregate, which is narrowed the same way.
     context: [july, august].map((records) => ({
       month: records.month,
       monthly: records.monthly.filter((row) => row.hm_id === target),
+      hpActive: (records.hpActive ?? []).filter((row) => row.hm_id === target),
     })),
   };
 
@@ -3169,9 +3245,26 @@ section("[26] the public HM view is the private HM screen, minus the session");
     const withoutBack = (detail: HmDetailViewModel) =>
       JSON.stringify({ ...detail, backHref: null });
 
+    // The HM Code and the link into `/hp` are the two things Stage 8 gives the
+    // private screen and deliberately withholds from a token holder. They are
+    // normalised out here and asserted on their own below, so this stays a
+    // real whole-object equality rather than a loosened one.
+    const comparable = (detail: HmDetailViewModel) =>
+      withoutBack({
+        ...detail,
+        hm: { ...detail.hm, hmCode: null },
+        secondary: detail.secondary.map((metric) => ({ ...metric, href: null })),
+      });
+
     check(
       "every figure on it equals the private HM screen's, whole model",
-      withoutBack(publicDetail) === withoutBack(privateDetail),
+      comparable(publicDetail) === comparable(privateDetail),
+    );
+
+    check(
+      "and the public model carries no HM Code and no link into the private app",
+      publicDetail.hm.hmCode === null &&
+        publicDetail.secondary.every((metric) => !metric.href),
     );
 
     // Named individually as well, because a whole-object equality that breaks

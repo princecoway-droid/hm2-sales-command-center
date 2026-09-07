@@ -21,6 +21,7 @@
 
 import { randomUUID } from "node:crypto";
 
+import type { HpActiveRecord } from "@/lib/calculations";
 import type {
   GroupMonthlyMetrics,
   HM,
@@ -47,6 +48,8 @@ export type HmSpec = {
   status?: "active" | "inactive";
   displayOrder?: number;
   office?: string;
+  /** Defaults to HM00001, HM00002, ... in roster order. */
+  hmCode?: string;
 };
 
 /** HMs keyed by name, so a spec can refer to "Alpha" and get a stable uuid. */
@@ -61,6 +64,9 @@ export function createRoster(specs: readonly (string | HmSpec)[]): Roster {
     roster.set(spec.name, {
       id: randomUUID(),
       name: spec.name,
+      // Every HM has a code, because the Stage 8 import matches on it and
+      // nothing in the application may treat it as optional.
+      hm_code: spec.hmCode ?? `HM${String(index + 1).padStart(5, "0")}`,
       office: spec.office ?? "Sample Office",
       photo_url: null,
       status: spec.status ?? "active",
@@ -95,7 +101,25 @@ export type MonthlySpec = {
   net?: number;
   target?: number;
   recruitment?: number;
+  /**
+   * Active HP for the month.
+   *
+   * NOT a column on `hm_monthly_performance` any more: since Stage 8 it is
+   * counted from the imported HP rows, so a spec that asks for 12 produces an
+   * `hm_monthly_hp_summary` entry of 12 active HPs rather than a keyed figure.
+   * Omitting it means no HP data was imported for that HM, which reads as blank
+   * - the distinction most of these tests exist to prove.
+   */
   activeHp?: number;
+  /**
+   * HP rows imported for this HM.
+   *
+   * Defaults to `activeHp`, or 1 when that is 0: `activeHp: 0` means "the file
+   * was imported and none of this HM's HPs were active", which is a real,
+   * entered zero and needs a row to exist. Leaving `activeHp` out entirely is
+   * how a spec says nothing was imported.
+   */
+  hpCount?: number;
   shi?: number;
   /** Defaults so the split identity holds: extrade 0, non-extrade all of net. */
   extrade?: number;
@@ -107,6 +131,12 @@ export type HmMonthSpec = {
   monthly?: MonthlySpec;
   /** One entry per configured week. `null` is blank, `0` is an entered zero. */
   weekly?: readonly (number | null)[];
+  /**
+   * Active HP with no monthly record at all - the Stage 8 case where a month's
+   * Excel has been imported before anybody keyed the HM KPIs in.
+   */
+  activeHp?: number;
+  hpCount?: number;
 };
 
 export type MonthSpec = {
@@ -189,7 +219,10 @@ export function buildMonthlyRow(
     net_units: net,
     target_net_units: spec.target ?? 0,
     recruitment: spec.recruitment ?? 0,
-    active_hp: spec.activeHp ?? 0,
+    // The deprecated column. Left at its default so no test can accidentally
+    // start passing because a figure was read from it: Active HP comes from
+    // `hpActive` below and from nowhere else.
+    active_hp: 0,
     shi_percentage: spec.shi ?? 0,
     extrade_units: extrade,
     // Keeps the database CHECK satisfied by default; override both to break it
@@ -242,12 +275,27 @@ export function buildMonthRecords(
 
   const monthly: HMMonthlyPerformance[] = [];
   const weekly: HMWeeklyPerformance[] = [];
+  const hpActive: HpActiveRecord[] = [];
 
   for (const [name, entry] of Object.entries(spec.hms)) {
     const id = hmId(roster, name);
 
     if (entry.monthly) {
       monthly.push(buildMonthlyRow(id, month.id, entry.monthly));
+    }
+
+    // What the database's own `hm_monthly_hp_summary` would return. An HM whose
+    // spec does not mention Active HP gets NO entry, which is "no HP data
+    // imported" - never "nobody was active".
+    const activeHp = entry.monthly?.activeHp ?? entry.activeHp;
+
+    if (activeHp !== undefined) {
+      hpActive.push({
+        hm_id: id,
+        hp_count:
+          entry.monthly?.hpCount ?? entry.hpCount ?? Math.max(activeHp, 1),
+        active_hp: activeHp,
+      });
     }
 
     (entry.weekly ?? []).forEach((value, index) => {
@@ -263,7 +311,7 @@ export function buildMonthRecords(
     });
   }
 
-  return { month, weeks, monthly, weekly };
+  return { month, weeks, monthly, weekly, hpActive };
 }
 
 // -----------------------------------------------------------------------------
@@ -288,7 +336,14 @@ export function singleHmMonth(
       year: 2026,
       month: 9,
       weeks: spec.weeks,
-      hms: { [name]: { monthly: spec.monthly, weekly: spec.weekly } },
+      hms: {
+        [name]: {
+          monthly: spec.monthly,
+          weekly: spec.weekly,
+          activeHp: spec.activeHp,
+          hpCount: spec.hpCount,
+        },
+      },
     }),
   };
 }

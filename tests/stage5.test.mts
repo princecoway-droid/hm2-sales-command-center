@@ -685,8 +685,13 @@ section("[9] recruitment, Active HP and SHI");
   const activeHp = metric(detail, "activeHp");
 
   check(
-    "Active HP is the keyed eTrust figure, never recalculated from sales",
-    activeHp.value === formatUnits(31) && activeHp.note === "From eTrust",
+    // Stage 8 moved the SOURCE of this figure - it is counted from the imported
+    // HP rows now rather than keyed in from eTrust - and left everything else
+    // about it alone: same tile, same place, same 31 for this HM and month.
+    "Active HP is counted from the HP rows, never recalculated from sales",
+    activeHp.value === formatUnits(31) &&
+      activeHp.note === "HPs with Key-In this month",
+    `${activeHp.value} / ${activeHp.note}`,
   );
 
   check(
@@ -745,9 +750,12 @@ section("[9] recruitment, Active HP and SHI");
   );
 
   check(
-    "an unentered Active HP says so too",
+    // Blank, not 0. A month whose HP Excel has not been imported has said
+    // nothing about this HM's HPs, and "0 active" would be a claim.
+    "a month with no HP data says so, rather than reporting zero active",
     metric(detail, "activeHp").value === "—" &&
-      metric(detail, "activeHp").note === "Not entered",
+      metric(detail, "activeHp").note === "No HP data imported",
+    `${metric(detail, "activeHp").value} / ${metric(detail, "activeHp").note}`,
   );
 
   check(
@@ -1735,12 +1743,15 @@ section("[22] the HM screen's fetch stays batched");
     source.includes('import "server-only"'),
   );
 
-  // Unchanged from Stage 4: the shared fetch is still six queries.
+  // Still a FIXED number of queries, whatever the position in the quarter.
+  // Stage 8 added one - the database-side Active HP count - and it is `in` the
+  // wanted months like every other, so the count does not grow with the roster,
+  // the quarter or the HP list.
   const dashboardSource = read("lib/data/dashboard.ts");
 
   check(
-    "the shared fetch is still six queries, whatever the position in the quarter",
-    (dashboardSource.match(/\.from\(/g) ?? []).length === 6,
+    "the shared fetch is still a fixed seven queries, whatever the position in the quarter",
+    (dashboardSource.match(/\.from\(/g) ?? []).length === 7,
   );
 }
 

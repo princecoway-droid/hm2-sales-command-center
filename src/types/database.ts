@@ -76,6 +76,8 @@ export type Database = {
         Row: {
           id: string;
           name: string;
+          /** The Coway identifier. Unique, uppercased and trimmed by trigger. */
+          hm_code: string;
           office: string;
           photo_url: string | null;
           status: Database["public"]["Enums"]["hm_status"];
@@ -83,9 +85,15 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
+        /**
+         * `hm_code` is optional here only because the column carries a
+         * sequence-backed default for direct database access. The application's
+         * own form requires it - see `hmSchema`.
+         */
         Insert: {
           id?: string;
           name: string;
+          hm_code?: string;
           office: string;
           photo_url?: string | null;
           status?: Database["public"]["Enums"]["hm_status"];
@@ -96,6 +104,7 @@ export type Database = {
         Update: {
           id?: string;
           name?: string;
+          hm_code?: string;
           office?: string;
           photo_url?: string | null;
           status?: Database["public"]["Enums"]["hm_status"];
@@ -294,6 +303,155 @@ export type Database = {
         ];
       };
 
+      hps: {
+        Row: {
+          id: string;
+          /** The Coway identifier. Unique, uppercased and trimmed by trigger. */
+          hp_code: string;
+          hp_name: string;
+          /** The HM who owns this HP TODAY. History lives on the monthly row. */
+          hm_id: string;
+        } & AuditColumns;
+        Insert: {
+          id?: string;
+          hp_code: string;
+          hp_name: string;
+          hm_id: string;
+        } & AuditInsert;
+        Update: {
+          id?: string;
+          hp_code?: string;
+          hp_name?: string;
+          hm_id?: string;
+        } & AuditInsert;
+        Relationships: [
+          {
+            foreignKeyName: "hps_hm_id_fkey";
+            columns: ["hm_id"];
+            isOneToOne: false;
+            referencedRelation: "hms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      hp_monthly_performance: {
+        Row: {
+          id: string;
+          month_id: string;
+          hp_id: string;
+          /** Which HM this HP reported to IN THIS MONTH. Never rewritten later. */
+          hm_id: string;
+          w1_key_in: number;
+          w2_key_in: number;
+          w3_key_in: number;
+          w4_key_in: number;
+          /** W1+W2+W3+W4. A database CHECK refuses any other value. */
+          total_key_in: number;
+          /** TOTAL NET for this month only - never lifetime or cumulative. */
+          total_net: number;
+        } & AuditColumns;
+        Insert: {
+          id?: string;
+          month_id: string;
+          hp_id: string;
+          hm_id: string;
+          w1_key_in?: number;
+          w2_key_in?: number;
+          w3_key_in?: number;
+          w4_key_in?: number;
+          total_key_in?: number;
+          total_net?: number;
+        } & AuditInsert;
+        Update: {
+          id?: string;
+          month_id?: string;
+          hp_id?: string;
+          hm_id?: string;
+          w1_key_in?: number;
+          w2_key_in?: number;
+          w3_key_in?: number;
+          w4_key_in?: number;
+          total_key_in?: number;
+          total_net?: number;
+        } & AuditInsert;
+        Relationships: [
+          {
+            foreignKeyName: "hp_monthly_performance_month_id_fkey";
+            columns: ["month_id"];
+            isOneToOne: false;
+            referencedRelation: "months";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hp_monthly_performance_hp_id_fkey";
+            columns: ["hp_id"];
+            isOneToOne: false;
+            referencedRelation: "hps";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "hp_monthly_performance_hm_id_fkey";
+            columns: ["hm_id"];
+            isOneToOne: false;
+            referencedRelation: "hms";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
+      hp_import_runs: {
+        Row: {
+          id: string;
+          month_id: string;
+          file_name: string;
+          rows_processed: number;
+          new_hp_count: number;
+          updated_hp_count: number;
+          active_hp_count: number;
+          inactive_hp_count: number;
+          status: string;
+          /** Stamped from auth.uid() by a trigger; never trusted from a client. */
+          imported_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          month_id: string;
+          file_name: string;
+          rows_processed?: number;
+          new_hp_count?: number;
+          updated_hp_count?: number;
+          active_hp_count?: number;
+          inactive_hp_count?: number;
+          status?: string;
+          imported_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          month_id?: string;
+          file_name?: string;
+          rows_processed?: number;
+          new_hp_count?: number;
+          updated_hp_count?: number;
+          active_hp_count?: number;
+          inactive_hp_count?: number;
+          status?: string;
+          imported_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "hp_import_runs_month_id_fkey";
+            columns: ["month_id"];
+            isOneToOne: false;
+            referencedRelation: "months";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+
       share_links: {
         Row: {
           id: string;
@@ -342,7 +500,55 @@ export type Database = {
       };
     };
 
-    Views: Record<never, never>;
+    /**
+     * Both are `security_invoker`, so RLS applies to the caller exactly as it
+     * does on the tables underneath them. Neither is writable.
+     */
+    Views: {
+      /** Active HP per HM per month. The single source of the figure. */
+      hm_monthly_hp_summary: {
+        Row: {
+          month_id: string;
+          hm_id: string;
+          /**
+           * HP rows for this HM and month. The presence of a row here is what
+           * separates "0 active" from "no HP data" - there is no row at all for
+           * an HM nothing has been imported for.
+           */
+          hp_count: number;
+          /** HP rows with total_key_in >= 1. */
+          active_hp: number;
+          hp_total_key_in: number;
+          hp_total_net: number;
+          /** Latest write to any of this HM's HP rows for the month. */
+          hp_updated_at: string | null;
+        };
+        Relationships: [];
+      };
+
+      /** One HP row of one month, with the HP and HM identities joined. */
+      hp_monthly_report: {
+        Row: {
+          id: string;
+          month_id: string;
+          hp_id: string;
+          hm_id: string;
+          hp_code: string;
+          hp_name: string;
+          hm_name: string;
+          hm_code: string;
+          w1_key_in: number;
+          w2_key_in: number;
+          w3_key_in: number;
+          w4_key_in: number;
+          total_key_in: number;
+          total_net: number;
+          is_active: boolean;
+          updated_at: string;
+        };
+        Relationships: [];
+      };
+    };
 
     Functions: {
       current_profile_role: {
@@ -384,6 +590,20 @@ export type Database = {
         Args: { p_token: string; p_hm_id: string };
         Returns: Json;
       };
+      /**
+       * The whole HP import, in one transaction.
+       *
+       * NOT `security definer`: every statement inside runs as the caller under
+       * the Stage 8 RLS policies. It validates the entire payload before
+       * writing anything, so a rejected import leaves the month exactly as it
+       * was. Returns the counts the result screen shows; typed as `Json`
+       * because it is a projection built in SQL, and narrowed in
+       * `lib/import/result.ts`.
+       */
+      import_hp_month: {
+        Args: { p_month_id: string; p_file_name: string; p_rows: Json };
+        Returns: Json;
+      };
     };
 
     /**
@@ -414,6 +634,10 @@ export type TablesInsert<T extends keyof PublicSchema["Tables"]> =
 /** Update payload for a table, e.g. `TablesUpdate<"hms">`. */
 export type TablesUpdate<T extends keyof PublicSchema["Tables"]> =
   PublicSchema["Tables"][T]["Update"];
+
+/** Row type for a view, e.g. `Views<"hp_monthly_report">`. Read-only. */
+export type Views<T extends keyof PublicSchema["Views"]> =
+  PublicSchema["Views"][T]["Row"];
 
 /** Narrowed union for a CHECK-constrained column, e.g. `Enums<"user_role">`. */
 export type Enums<T extends keyof PublicSchema["Enums"]> =

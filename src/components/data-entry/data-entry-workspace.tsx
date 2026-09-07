@@ -248,7 +248,6 @@ export function DataEntryWorkspace({
                   net_units: null,
                   target_net_units: null,
                   recruitment: null,
-                  active_hp: null,
                   shi_percentage: null,
                   extrade_units: null,
                   non_extrade_units: null,

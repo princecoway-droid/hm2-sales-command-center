@@ -1,4 +1,4 @@
-import type { HmMonthlyRecord } from "@/lib/calculations";
+import type { HmMonthlyRecord, HpActiveRecord } from "@/lib/calculations";
 import { parseSharePayload, type SharePayload } from "@/lib/share/resolve";
 import type { HmDetailViewModel } from "@/lib/view-models/hm-detail";
 import { buildHmDetailViewModel } from "@/lib/view-models/hm-detail";
@@ -39,6 +39,8 @@ export type ShareHmContextMonth = {
   month: Month;
   /** The requested HM's row, or none. Never the roster's. */
   monthly: HmMonthlyRecord[];
+  /** The requested HM's Active HP count for that month. Never the roster's. */
+  hpActive: HpActiveRecord[];
 };
 
 /** Exactly the shape `public.resolve_share_hm_report` builds. */
@@ -104,6 +106,9 @@ function parseContext(value: unknown): ShareHmContextMonth[] {
       monthly: Array.isArray(record.monthly)
         ? (record.monthly as HmMonthlyRecord[])
         : [],
+      hpActive: Array.isArray(record.hp_active)
+        ? (record.hp_active as HpActiveRecord[])
+        : [],
     });
   }
 
@@ -137,6 +142,7 @@ export function buildShareHmDetail(
     weeks: payload.weeks,
     monthly: payload.monthly,
     weekly: payload.weekly,
+    hpActive: payload.hpActive,
   };
 
   const model = buildHmPerformanceViewModel(
@@ -154,6 +160,7 @@ export function buildShareHmDetail(
           weeks: [],
           monthly: entry.monthly,
           weekly: [],
+          hpActive: entry.hpActive,
         })),
       ],
       groupShiPct:
@@ -174,5 +181,9 @@ export function buildShareHmDetail(
     // no "that month could not be opened" story to tell a public viewer.
     notice: null,
     backHref,
+    // The one caller that is not the signed-in screen. `public` strips the HM
+    // Code and the link into `/hp` from the MODEL, so no component rendering
+    // this can put either in front of a WhatsApp recipient.
+    audience: "public",
   });
 }

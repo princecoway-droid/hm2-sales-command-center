@@ -111,6 +111,9 @@ function calculateOneMonth(
     weeks: records.weeks,
     monthly: records.monthly,
     weekly: records.weekly,
+    // Active HP is counted from the HP import since Stage 8, so it reaches the
+    // engine beside the monthly figures rather than inside them.
+    hpActive: records.hpActive,
   });
 
   return calculateGroupMonthlyPerformance({

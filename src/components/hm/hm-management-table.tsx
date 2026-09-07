@@ -103,6 +103,9 @@ export function HmManagementTable({ hms, canDelete }: HmManagementTableProps) {
                   HM
                 </th>
                 <th scope="col" className="py-2 pr-4 font-medium">
+                  HM Code
+                </th>
+                <th scope="col" className="py-2 pr-4 font-medium">
                   Office
                 </th>
                 <th scope="col" className="py-2 pr-4 font-medium">
@@ -129,6 +132,12 @@ export function HmManagementTable({ hms, canDelete }: HmManagementTableProps) {
                           {hm.name}
                         </span>
                       </div>
+                    </td>
+                    {/* Monospaced and tabular: a column of codes is scanned
+                        for a difference of one character, and a proportional
+                        font is what makes HM10321 and HM10231 look alike. */}
+                    <td className="py-2.5 pr-4 font-mono text-xs tabular-nums text-slate-700">
+                      {hm.hm_code}
                     </td>
                     <td className="py-2.5 pr-4 text-slate-600">{hm.office}</td>
                     <td className="py-2.5 pr-4 tabular-nums text-slate-500">

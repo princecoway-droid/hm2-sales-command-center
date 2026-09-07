@@ -406,16 +406,6 @@ const PerformanceGridRow = memo(function PerformanceGridRow({
         hm={hm}
         draft={draft}
         errors={rowErrors}
-        field="active_hp"
-        label="Active HP"
-        rowIndex={rowIndex}
-        column={monthlyColumn("active_hp")}
-        onCellChange={onCellChange}
-      />
-      <MonthlyCell
-        hm={hm}
-        draft={draft}
-        errors={rowErrors}
         field="shi_percentage"
         label="SHI percentage"
         rowIndex={rowIndex}

@@ -1,4 +1,8 @@
-import type { HmMonthlyRecord, HmWeeklyRecord } from "@/lib/calculations";
+import type {
+  HmMonthlyRecord,
+  HmWeeklyRecord,
+  HpActiveRecord,
+} from "@/lib/calculations";
 import { buildDashboardViewModel } from "@/lib/view-models/dashboard";
 import { buildMonthlyPerformanceViewModel } from "@/lib/view-models/monthly-performance";
 import {
@@ -29,6 +33,13 @@ export type SharePayload = {
   hms: HM[];
   monthly: HmMonthlyRecord[];
   weekly: HmWeeklyRecord[];
+  /**
+   * Active HP per HM: a COUNT, never HP records.
+   *
+   * The only HP figure a share token can produce. `hp_count` travels with it so
+   * an HM with no imported HPs reads as blank rather than as zero active.
+   */
+  hpActive: HpActiveRecord[];
   /** `numeric` can arrive as a string depending on the driver. */
   groupShiPct: number | string | null;
   lastUpdatedAt: string | null;
@@ -69,6 +80,7 @@ export function parseSharePayload(data: unknown): SharePayload | null {
     hms: asArray<HM>(raw.hms),
     monthly: asArray<HmMonthlyRecord>(raw.monthly),
     weekly: asArray<HmWeeklyRecord>(raw.weekly),
+    hpActive: asArray<HpActiveRecord>(raw.hp_active),
     groupShiPct:
       typeof shi === "number" || typeof shi === "string" ? shi : null,
     lastUpdatedAt: typeof updated === "string" ? updated : null,
@@ -101,6 +113,7 @@ export function buildShareReport(
         weeks: payload.weeks,
         monthly: payload.monthly,
         weekly: payload.weekly,
+        hpActive: payload.hpActive,
       },
     ],
     groupShiPct:

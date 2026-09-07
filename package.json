@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "node --import ./tests/alias-loader.mjs ./tests/validation.test.mts",
     "test:stage2": "node --import ./tests/alias-loader.mjs ./tests/stage2.test.mts",
-    "test": "npm run test:unit && npm run test:stage2 && npm run test:stage3 && npm run test:stage4 && npm run test:stage5 && npm run test:stage6 && npm run db:test",
+    "test": "npm run test:unit && npm run test:stage2 && npm run test:stage3 && npm run test:stage4 && npm run test:stage5 && npm run test:stage6 && npm run test:stage8 && npm run db:test",
     "check": "npm run typecheck && npm run lint && npm run test && npm run build",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
@@ -26,7 +26,8 @@
     "test:stage3": "node --import ./tests/alias-loader.mjs ./tests/stage3.test.mts",
     "test:stage4": "node --import ./tests/alias-loader.mjs ./tests/stage4.test.mts",
     "test:stage5": "node --import ./tests/alias-loader.mjs ./tests/stage5.test.mts",
-    "test:stage6": "node --import ./tests/alias-loader.mjs ./tests/stage6.test.mts"
+    "test:stage6": "node --import ./tests/alias-loader.mjs ./tests/stage6.test.mts",
+    "test:stage8": "node --import ./tests/alias-loader.mjs ./tests/stage8.test.mts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

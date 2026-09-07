@@ -1,3 +1,8 @@
+import {
+  hpActiveEntry,
+  indexHpActiveByHm,
+  type HpActiveRecord,
+} from "@/lib/calculations/hp";
 import type { Entry } from "@/lib/calculations/performance";
 import type {
   HM,
@@ -61,7 +66,6 @@ export type HmMonthlyRecord = Pick<
   | "net_units"
   | "target_net_units"
   | "recruitment"
-  | "active_hp"
   | "shi_percentage"
   | "extrade_units"
   | "non_extrade_units"
@@ -81,6 +85,8 @@ export type HmWeeklyRecord = Pick<
 export type HmProfileInput = {
   hmId: string;
   hmName: string;
+  /** The Coway identifier. Shown wherever an HM is named, and never inferred. */
+  hmCode: string;
   office: string;
   photoUrl: string | null;
   /** `hms.status` today, not "was active during this month". See `selectHmsForMonth`. */
@@ -89,12 +95,19 @@ export type HmProfileInput = {
   displayOrder: number;
 };
 
-/** The monthly figures, with blanks preserved. `null` throughout means no row. */
+/**
+ * The monthly figures, with blanks preserved. `null` throughout means no row.
+ *
+ * Active HP is deliberately NOT here. It is no longer a keyed figure: from
+ * Stage 8 it is counted from the imported HP rows, which exist independently of
+ * whether the PA has filled in this HM's monthly KPIs. It therefore lives on
+ * `HmMonthInput` beside this object rather than inside it - an HM with imported
+ * HPs and no monthly row still has an Active HP figure.
+ */
 export type HmMonthlyInput = {
   netUnits: Entry;
   targetNetUnits: Entry;
   recruitment: Entry;
-  activeHp: Entry;
   /** Keyed in from eTrust. Never calculated, never rolled up. */
   shiPct: Entry;
   extradeUnits: Entry;
@@ -117,6 +130,14 @@ export type HmMonthInput = {
   monthly: HmMonthlyInput | null;
   /** Keyed by `sales_weeks.id`. A missing key is a blank week, not a zero one. */
   weeklyKeyIn: Readonly<Record<string, number>>;
+  /**
+   * Active HP for this HM and month: HPs whose Total Key-In is at least 1.
+   *
+   * Derived, never keyed. `null` means no HP data has been imported for this
+   * HM and month - which is not the same as 0 active HPs, and must not be
+   * shown as one.
+   */
+  activeHp: Entry;
 };
 
 /** A reporting month, reduced to what the engine actually reasons about. */
@@ -138,6 +159,7 @@ export function toHmProfileInput(hm: HM): HmProfileInput {
   return {
     hmId: hm.id,
     hmName: hm.name,
+    hmCode: hm.hm_code,
     office: hm.office,
     photoUrl: hm.photo_url,
     isActive: hm.status === "active",
@@ -150,7 +172,6 @@ export function toHmMonthlyInput(row: HmMonthlyRecord): HmMonthlyInput {
     netUnits: row.net_units,
     targetNetUnits: row.target_net_units,
     recruitment: row.recruitment,
-    activeHp: row.active_hp,
     // numeric(5,2) can arrive as a string from PostgREST depending on the
     // driver, so it is normalised here rather than at seven call sites.
     shiPct: Number(row.shi_percentage),
@@ -164,7 +185,6 @@ export const EMPTY_MONTHLY_INPUT: HmMonthlyInput = {
   netUnits: null,
   targetNetUnits: null,
   recruitment: null,
-  activeHp: null,
   shiPct: null,
   extradeUnits: null,
   nonExtradeUnits: null,
@@ -241,6 +261,14 @@ export type MonthRecords = {
   weeks: readonly SalesWeek[];
   monthly: readonly HmMonthlyRecord[];
   weekly: readonly HmWeeklyRecord[];
+  /**
+   * Active HP per HM for this month, counted by the database.
+   *
+   * Optional so a caller that has no HP data - a test of the sales figures, a
+   * month imported before Stage 8 - reads as "no HP data" rather than as zero
+   * active HPs everywhere.
+   */
+  hpActive?: readonly HpActiveRecord[];
 };
 
 /**
@@ -274,6 +302,7 @@ export function buildHmMonthInputs(records: MonthRecords): HmMonthInput[] {
   }
 
   const hms = selectHmsForMonth(records.hms, records.monthly, records.weekly);
+  const hpActiveByHm = indexHpActiveByHm(records.hpActive ?? []);
 
   return hms.map((hm) => {
     const saved = monthlyByHm.get(hm.id);
@@ -282,6 +311,7 @@ export function buildHmMonthInputs(records: MonthRecords): HmMonthInput[] {
       hm: toHmProfileInput(hm),
       monthly: saved ? toHmMonthlyInput(saved) : null,
       weeklyKeyIn: weeklyByHm.get(hm.id) ?? {},
+      activeHp: hpActiveEntry(hpActiveByHm.get(hm.id)),
     };
   });
 }
@@ -328,5 +358,8 @@ export function buildHmMonthInput(
     hm: toHmProfileInput(hm),
     monthly: saved ? toHmMonthlyInput(saved) : null,
     weeklyKeyIn,
+    activeHp: hpActiveEntry(
+      (records.hpActive ?? []).find((entry) => entry.hm_id === hm.id),
+    ),
   };
 }

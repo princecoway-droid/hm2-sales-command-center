@@ -19,20 +19,27 @@
 --
 --   Perf data NOT seeded. No fabricated net units, SHI or Key-In figures.
 --
+--   HP data  NOT seeded. HP rows arrive through the Excel import, and inventing
+--            them here would put fabricated Active HP figures on the dashboard.
+--
 -- Everything below is idempotent, so re-running is safe.
 -- =============================================================================
 
--- `hms` has no natural unique key - two real Health Managers could share a
--- name - so ON CONFLICT has nothing to match on and would happily insert a
--- second copy of every sample row. Guard on the name instead.
-insert into public.hms (name, office, status, display_order)
-select sample.name, sample.office, sample.status, sample.display_order
+-- `hms` now has a natural unique key - hm_code - but the guard still keys on
+-- the name: a developer who has already edited a sample record's code should
+-- not get a second copy of it on the next reset.
+--
+-- The codes are obviously fictional and obviously placeholders. They exist so
+-- the Stage 8 HP import has something to match against locally; the real Coway
+-- codes are keyed in through HM Management.
+insert into public.hms (name, hm_code, office, status, display_order)
+select sample.name, sample.hm_code, sample.office, sample.status, sample.display_order
 from (values
-  ('Sample HM A', 'Sample Office', 'active',   1),
-  ('Sample HM B', 'Sample Office', 'active',   2),
-  ('Sample HM C', 'Sample Office', 'active',   3),
-  ('Sample HM D', 'Sample Office', 'inactive', 4)
-) as sample (name, office, status, display_order)
+  ('Sample HM A', 'HMSAMPLEA', 'Sample Office', 'active',   1),
+  ('Sample HM B', 'HMSAMPLEB', 'Sample Office', 'active',   2),
+  ('Sample HM C', 'HMSAMPLEC', 'Sample Office', 'active',   3),
+  ('Sample HM D', 'HMSAMPLED', 'Sample Office', 'inactive', 4)
+) as sample (name, hm_code, office, status, display_order)
 where not exists (
   select 1 from public.hms existing where existing.name = sample.name
 );

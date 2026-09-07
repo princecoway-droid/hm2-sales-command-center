@@ -49,6 +49,7 @@ import {
   isGroupShiDirty,
   isRowDirty,
   monthlyValues,
+  MONTHLY_FIELDS,
   rowValues,
   toCompletenessRow,
   toEntry,
@@ -92,9 +93,16 @@ const check = (name: string, ok: boolean, detail = "") => {
 
 const MONTH_ID = randomUUID();
 
+let hmCodeCounter = 0;
+
 function hm(name: string, overrides: Partial<HM> = {}): HM {
+  hmCodeCounter += 1;
+
   return {
     id: randomUUID(),
+    // Required since Stage 8: the Excel import matches on the code, so nothing
+    // in the application may treat an HM as having none.
+    hm_code: `HM${String(hmCodeCounter).padStart(5, "0")}`,
     name,
     office: "Sample Office",
     photo_url: null,
@@ -274,7 +282,6 @@ const balancedRow = {
   net_units: 72,
   target_net_units: 100,
   recruitment: 6,
-  active_hp: 31,
   shi_percentage: 78,
   extrade_units: 28,
   non_extrade_units: 44,
@@ -540,7 +547,6 @@ const partial: RowDraft = {
     net_units: "76",
     target_net_units: "100",
     recruitment: "",
-    active_hp: "",
     shi_percentage: "",
     extrade_units: "",
     non_extrade_units: "",
@@ -616,13 +622,19 @@ check(
   ),
 );
 check(
-  "a negative Active HP is flagged",
+  "a negative recruitment is flagged",
   Boolean(
     validateRow(
-      { ...partial, monthly: { ...partial.monthly, active_hp: "-1" } },
+      { ...partial, monthly: { ...partial.monthly, recruitment: "-1" } },
       WEEKS,
-    ).active_hp,
+    ).recruitment,
   ),
+);
+// Active HP has no cell to be negative in any more: since Stage 8 it is counted
+// from the imported HP rows, so the grid does not offer it as an input at all.
+check(
+  "the grid no longer carries an Active HP cell",
+  !(MONTHLY_FIELDS as readonly string[]).includes("active_hp"),
 );
 check(
   "a negative weekly Key-In is flagged",
@@ -642,7 +654,6 @@ check(
           net_units: "72",
           target_net_units: "100",
           recruitment: "6",
-          active_hp: "31",
           shi_percentage: "78",
           extrade_units: "28",
           non_extrade_units: "44",
@@ -663,7 +674,6 @@ const blankRow = (id: string): CompletenessRow => ({
   net_units: null,
   target_net_units: null,
   recruitment: null,
-  active_hp: null,
   shi_percentage: null,
   extrade_units: null,
   non_extrade_units: null,
@@ -945,6 +955,7 @@ check(
   "a valid HM is accepted with a display order",
   hmSchema.safeParse({
     name: "Sample HM A",
+    hm_code: "HM00001",
     office: "Sample Office",
     status: "active",
     display_order: 3,
@@ -954,6 +965,7 @@ check(
   "deactivating is just a status change, and is valid",
   hmSchema.safeParse({
     name: "Sample HM A",
+    hm_code: "HM00001",
     office: "Sample Office",
     status: "inactive",
   }).success,

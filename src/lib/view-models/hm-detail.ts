@@ -66,6 +66,14 @@ export type HmMetricModel = {
   status: PerformanceStatus | null;
   /** The band in words. Status is never carried by colour alone. */
   statusLabel: string | null;
+  /**
+   * Where the figure can be looked at, when there is somewhere to look.
+   *
+   * Only Active HP has one, and only on the signed-in screen: it is a count of
+   * rows a manager can go and read. `null` on the public view, where the
+   * destination is behind a login.
+   */
+  href?: string | null;
 };
 
 /** One Coway period on the HM's weekly strip. */
@@ -119,6 +127,17 @@ export type HmSalesMixModel = {
 export type HmIdentityModel = {
   id: string;
   name: string;
+  /**
+   * The Coway identifier, or `null` for a public viewer.
+   *
+   * It is a required, prominent field on the signed-in screen - it is the key
+   * the HP import matches on, and a PA checking a mapping needs to read it. It
+   * is deliberately absent from the shared report: a link pasted into a group
+   * chat has no business carrying an internal identifier, and leaving it out of
+   * the MODEL rather than out of the markup means no future component can start
+   * rendering it by accident.
+   */
+  hmCode: string | null;
   office: string;
   photoUrl: string | null;
   isActive: boolean;
@@ -302,7 +321,10 @@ function buildSalesMix(hm: HMMonthlyCalculatedPerformance): HmSalesMixModel {
   };
 }
 
-function buildSecondary(hm: HMMonthlyCalculatedPerformance): HmMetricModel[] {
+function buildSecondary(
+  hm: HMMonthlyCalculatedPerformance,
+  hpListingHref: string | null,
+): HmMetricModel[] {
   const recruitment = unitsLabel(hm.recruitment);
 
   return [
@@ -322,10 +344,16 @@ function buildSecondary(hm: HMMonthlyCalculatedPerformance): HmMetricModel[] {
       label: "Active HP",
       value: unitsLabel(hm.activeHp),
       unit: null,
-      // Keyed in from eTrust. Never recalculated from sales.
-      note: hm.activeHp === null ? "Not entered" : "From eTrust",
+      // COUNTED from the imported HP rows since Stage 8: this HM's HPs whose
+      // Total Key-In for the month is at least 1. Blank rather than 0 when no
+      // HP file has been imported for them.
+      note:
+        hm.activeHp === null
+          ? "No HP data imported"
+          : "HPs with Key-In this month",
       status: null,
       statusLabel: null,
+      href: hm.activeHp === null ? null : (hpListingHref ?? null),
     },
     {
       key: "shi",
@@ -361,6 +389,23 @@ export type HmDetailPresenterInput = {
    * page's model entirely, instead of merely unrendered.
    */
   backHref?: string;
+  /**
+   * Who is reading.
+   *
+   * `public` is the share-token view, and it strips the internal identifiers
+   * that view must not carry - today, the HM Code. Deciding it here rather than
+   * in the components means a public page cannot start showing one because
+   * somebody added a field to a card.
+   */
+  audience?: "private" | "public";
+  /**
+   * Where the Active HP figure links, on the signed-in screen.
+   *
+   * Passed in rather than built here so the presenter stays free of route
+   * construction, and so the public view - whose viewer cannot open `/hp` -
+   * simply has none.
+   */
+  hpListingHref?: string | null;
 };
 
 export function buildHmDetailViewModel({
@@ -369,6 +414,8 @@ export function buildHmDetailViewModel({
   lastUpdatedAt,
   notice = null,
   backHref,
+  audience = "private",
+  hpListingHref = null,
 }: HmDetailPresenterInput): HmDetailViewModel {
   const hm = model.performance;
 
@@ -381,6 +428,7 @@ export function buildHmDetailViewModel({
     hm: {
       id: hm.hmId,
       name: hm.hmName,
+      hmCode: audience === "public" ? null : hm.hmCode,
       office: hm.office,
       photoUrl: hm.photoUrl,
       isActive: hm.isActive,
@@ -467,7 +515,10 @@ export function buildHmDetailViewModel({
       hasTarget,
     },
 
-    secondary: buildSecondary(hm),
+    secondary: buildSecondary(
+      hm,
+      audience === "public" ? null : hpListingHref,
+    ),
     weekly: buildWeekly(hm),
     salesMix: buildSalesMix(hm),
     previousMonthNet: buildMonthOverMonthModel(model.previousMonthNet),

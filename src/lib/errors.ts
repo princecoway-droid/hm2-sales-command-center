@@ -112,6 +112,69 @@ const CONSTRAINT_MESSAGES: Record<string, ConstraintMessage> = {
     field: "shi_percentage",
   },
 
+  // hms - Stage 8 HM Code
+  hms_hm_code_key: {
+    message: "Another HM already has that HM Code.",
+    field: "hm_code",
+  },
+  hms_hm_code_format: {
+    message:
+      "HM Code may use letters, digits and . _ - / only, with no spaces.",
+    field: "hm_code",
+  },
+
+  // hps
+  hps_hp_code_key: { message: "Another HP already has that HP Code." },
+  hps_hp_name_not_blank: { message: "HP Name is required." },
+  hps_hp_code_format: {
+    message:
+      "HP Code may use letters, digits and . _ - / only, with no spaces.",
+  },
+
+  // hp_monthly_performance
+  hp_monthly_performance_month_hp_key: {
+    message: "That HP already has a record for this month.",
+  },
+  hp_monthly_performance_total_derived: {
+    message:
+      "Total Key-In must equal W1 + W2 + W3 + W4. Re-upload the spreadsheet and check the preview.",
+  },
+  hp_monthly_performance_total_net_natural: {
+    message: "Total Net cannot be negative.",
+  },
+
+  // import_hp_month raises these itself, carrying the offending rows or codes
+  // in the message. They are the boundary's version of what the preview
+  // already said, for a caller that skipped the preview.
+  hp_import_not_permitted: {
+    message: "You do not have permission to import HP data.",
+  },
+  hp_import_unknown_month: {
+    message: "That reporting month no longer exists. Reload the page.",
+  },
+  hp_import_no_rows: { message: "That import carried no rows." },
+  hp_import_too_many_rows: {
+    message: "That file has more rows than one import may carry.",
+  },
+  hp_import_missing_field: {
+    message:
+      "Some rows are missing an HM Code, HP Code or HP Name. Nothing was imported.",
+  },
+  hp_import_negative_value: {
+    message: "Some rows have a negative Key-In or Total Net. Nothing was imported.",
+  },
+  hp_import_total_mismatch: {
+    message:
+      "Some rows have a Total Key-In that does not match W1-W4. Nothing was imported.",
+  },
+  hp_import_duplicate_hp_code: {
+    message: "The same HP Code appears more than once. Nothing was imported.",
+  },
+  hp_import_unknown_hm_code: {
+    message:
+      "Some rows name an HM Code that does not exist. Nothing was imported.",
+  },
+
   // profiles
   profiles_role_allowed: { message: "Role must be manager or PA.", field: "role" },
   profiles_full_name_not_blank: { message: "Full name is required.", field: "full_name" },

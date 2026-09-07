@@ -24,11 +24,16 @@ type HmCardProps = {
  * asks of a dashboard.
  *
  * The whole card opens that HM's own screen, on the month currently being
- * looked at. There is exactly ONE link in it - on the name - stretched over the
- * card by a positioned pseudo-element, rather than a wrapper `<a>` around the
- * figures. That keeps the accessible name short and meaningful ("Alisha,
- * Amcorp Mall") instead of a screen reader announcing a link made of eight
- * numbers, and it leaves the text inside selectable.
+ * looked at. The primary link is on the NAME, stretched over the card by a
+ * positioned pseudo-element, rather than a wrapper `<a>` around the figures.
+ * That keeps the accessible name short and meaningful ("Alisha, Amcorp Mall")
+ * instead of a screen reader announcing a link made of eight numbers, and it
+ * leaves the text inside selectable.
+ *
+ * The Active HP figure is the one exception: it is a second, smaller link, to
+ * that HM's HP list for this month. It sits above the stretched overlay with
+ * `relative z-10`, which is the whole of what makes it clickable - without it
+ * the overlay would swallow the click and open the HM screen instead.
  *
  * Fixed structure keeps a grid of them aligned: every card has the same rows,
  * whether or not the figures behind them have been entered.
@@ -53,9 +58,9 @@ export function HmCard({ hm }: HmCardProps) {
                 a name on two lines. */}
             <h3 className="text-sm font-semibold break-words text-slate-900">
               {/* `after:absolute inset-0` turns the card into the hit area
-                  without nesting the figures inside the anchor. `relative z-10`
-                  on the rank badge is not needed - nothing else in the card is
-                  interactive, so there is no click for the overlay to steal. */}
+                  without nesting the figures inside the anchor. Anything else
+                  in the card that has to stay clickable - the Active HP figure
+                  below - lifts itself above this overlay with `relative z-10`. */}
               <Link
                 href={hm.href}
                 className="outline-none after:absolute after:inset-0 after:rounded-lg group-hover:text-sky-900"
@@ -69,7 +74,20 @@ export function HmCard({ hm }: HmCardProps) {
             </h3>
             {!hm.isActive ? <Badge tone="muted">Inactive</Badge> : null}
           </div>
-          <p className="text-xs break-words text-slate-500">{hm.office}</p>
+          {/* The HM Code is a business identifier, not decoration: it is the
+              key the HP import matches on, so a PA checking a mapping has to be
+              able to read it here. Set below the name and in a lighter weight -
+              clearly secondary, never hidden. */}
+          <p className="text-xs break-words text-slate-500">
+            {hm.office}
+            <span className="mx-1.5 text-slate-300" aria-hidden>
+              ·
+            </span>
+            <span className="font-medium tabular-nums text-slate-600">
+              <span className="sr-only">HM Code </span>
+              {hm.hmCode}
+            </span>
+          </p>
         </div>
 
         <span
@@ -89,7 +107,12 @@ export function HmCard({ hm }: HmCardProps) {
           value={hm.recruitmentLabel}
           status={hm.recruitmentStatus}
         />
-        <Figure label="Active HP" value={hm.activeHpLabel} />
+        <Figure
+          label="Active HP"
+          value={hm.activeHpLabel}
+          href={hm.activeHpHref}
+          hrefLabel={`Active HP for ${hm.name} - open the HP list`}
+        />
       </dl>
 
       <div className="mt-4 border-t border-slate-100 pt-3">
@@ -122,9 +145,24 @@ type FigureProps = {
   emphasis?: boolean;
   /** Rendered as a dot AND a word, never as colour alone. */
   status?: keyof typeof STATUS_DOT_CLASSES;
+  /**
+   * Makes the figure itself a link.
+   *
+   * `relative z-10` is what makes it work at all: the card's stretched overlay
+   * covers everything, so a link that did not lift above it would be dead.
+   */
+  href?: string | null;
+  hrefLabel?: string;
 };
 
-function Figure({ label, value, emphasis, status }: FigureProps) {
+function Figure({
+  label,
+  value,
+  emphasis,
+  status,
+  href,
+  hrefLabel,
+}: FigureProps) {
   return (
     <div className="min-w-0">
       <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
@@ -136,7 +174,17 @@ function Figure({ label, value, emphasis, status }: FigureProps) {
           emphasis ? "text-2xl leading-none" : "text-lg leading-none",
         )}
       >
-        {value}
+        {href ? (
+          <Link
+            href={href}
+            aria-label={hrefLabel ?? `${label}, ${value}`}
+            className="relative z-10 rounded underline decoration-sky-300 decoration-2 underline-offset-4 hover:text-sky-800 hover:decoration-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+          >
+            {value}
+          </Link>
+        ) : (
+          value
+        )}
         {status && status !== "neutral" ? (
           <>
             <span

@@ -94,7 +94,15 @@ export type HmDataPresence = {
   weeksConfigured: number;
   weeksEntered: number;
   weeksBlank: number;
-  /** Any figure at all - a monthly row, or one week of Key-In. */
+  /** HP rows have been imported for this HM and month. */
+  hasHpData: boolean;
+  /**
+   * Any figure at all - a monthly row, one week of Key-In, or imported HP data.
+   *
+   * HP data counts because a month whose Excel has been imported but whose HM
+   * KPIs have not been keyed in yet is a month with figures on it; showing the
+   * dashboard's empty state over the top of them would hide real numbers.
+   */
   hasAnyData: boolean;
 };
 
@@ -102,6 +110,8 @@ export type HMMonthlyCalculatedPerformance = {
   // Identity
   hmId: string;
   hmName: string;
+  /** The Coway identifier. The key the HP import matches on, so it is shown. */
+  hmCode: string;
   office: string;
   photoUrl: string | null;
   /**
@@ -125,7 +135,14 @@ export type HMMonthlyCalculatedPerformance = {
   /** New recruitment for this month only. Never cumulative, never carried forward. */
   recruitment: Entry;
   recruitmentStatus: PerformanceStatus;
-  /** From eTrust: HPs with at least one net sale. Never derived from sales. */
+  /**
+   * HPs of this HM whose Total Key-In for the month is at least 1.
+   *
+   * Counted from the imported HP rows since Stage 8 - never keyed in, and never
+   * read from the deprecated `hm_monthly_performance.active_hp` column. `null`
+   * means no HP data has been imported for this HM and month, which is not the
+   * same as 0 and is never shown as one.
+   */
   activeHp: Entry;
   /** From eTrust. Never calculated, and never averaged into the group figure. */
   shiPct: Entry;
@@ -186,6 +203,7 @@ export function calculateHmMonthlyPerformance(
   return {
     hmId: input.hm.hmId,
     hmName: input.hm.hmName,
+    hmCode: input.hm.hmCode,
     office: input.hm.office,
     photoUrl: input.hm.photoUrl,
     isActive: input.hm.isActive,
@@ -199,7 +217,9 @@ export function calculateHmMonthlyPerformance(
 
     recruitment,
     recruitmentStatus: recruitmentStatus(recruitment),
-    activeHp: monthly?.activeHp ?? null,
+    // Off the input itself, not off `monthly`: an HM can have imported HPs
+    // without anybody having keyed their monthly KPIs in yet.
+    activeHp: input.activeHp,
     shiPct: monthly?.shiPct ?? null,
 
     extradeUnits,
@@ -215,7 +235,9 @@ export function calculateHmMonthlyPerformance(
       weeksConfigured: weeks.length,
       weeksEntered,
       weeksBlank: weeks.length - weeksEntered,
-      hasAnyData: monthly !== null || weeksEntered > 0,
+      hasHpData: input.activeHp !== null,
+      hasAnyData:
+        monthly !== null || weeksEntered > 0 || input.activeHp !== null,
     },
   };
 }

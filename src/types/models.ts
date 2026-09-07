@@ -11,6 +11,7 @@ import type {
   Tables,
   TablesInsert,
   TablesUpdate,
+  Views,
 } from "@/types/database";
 
 // -----------------------------------------------------------------------------
@@ -73,6 +74,35 @@ export type GroupMonthlyMetricsUpdate = TablesUpdate<"group_monthly_metrics">;
 export type ShareLink = Tables<"share_links">;
 export type ShareLinkInsert = TablesInsert<"share_links">;
 export type ShareLinkUpdate = TablesUpdate<"share_links">;
+
+// -----------------------------------------------------------------------------
+// HP (Stage 8)
+// -----------------------------------------------------------------------------
+
+/**
+ * An HP. Not a user account, exactly like an HM.
+ *
+ * One row per HP Code for the life of that code: an HP who disappears from a
+ * monthly import keeps their record, and a reactivated HP given a NEW code by
+ * Coway is a NEW row rather than a merge.
+ */
+export type HP = Tables<"hps">;
+export type HPInsert = TablesInsert<"hps">;
+export type HPUpdate = TablesUpdate<"hps">;
+
+/** One HP, one reporting month: W1-W4 Key-In, Total Key-In and Total Net. */
+export type HPMonthlyPerformance = Tables<"hp_monthly_performance">;
+export type HPMonthlyPerformanceInsert = TablesInsert<"hp_monthly_performance">;
+export type HPMonthlyPerformanceUpdate = TablesUpdate<"hp_monthly_performance">;
+
+/** The audit trail of HP imports. One row per successful import. */
+export type HPImportRun = Tables<"hp_import_runs">;
+
+/** Active HP per HM per month, counted by the database. Read-only. */
+export type HmMonthlyHpSummary = Views<"hm_monthly_hp_summary">;
+
+/** One HP row of one month with the HP and HM identities joined. Read-only. */
+export type HpMonthlyReportRow = Views<"hp_monthly_report">;
 
 // -----------------------------------------------------------------------------
 // Session

@@ -22,6 +22,7 @@ import {
   type QtdMonthContribution,
   type HmMonthlyRecord,
   type HmWeeklyRecord,
+  type HpActiveRecord,
   type QtdPerformance,
   type RankedHm,
   type RankingOptions,
@@ -69,6 +70,13 @@ export type MonthPerformanceRecords = {
    */
   monthly: HmMonthlyRecord[];
   weekly: HmWeeklyRecord[];
+  /**
+   * Active HP per HM for this month, counted by the database.
+   *
+   * Optional because a month that predates the HP import genuinely has none,
+   * and "no HP data" has to stay distinguishable from "nobody was active".
+   */
+  hpActive?: HpActiveRecord[];
 };
 
 export type PerformanceBundle = {
@@ -148,6 +156,7 @@ function calculateMonth(
     weeks: records.weeks,
     monthly: records.monthly,
     weekly: records.weekly,
+    hpActive: records.hpActive,
   });
 
   return calculateGroupMonthlyPerformance({

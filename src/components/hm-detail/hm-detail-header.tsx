@@ -78,8 +78,23 @@ export function HmDetailHeader({
               ) : null}
             </div>
 
+            {/* The HM Code sits with the office, directly under the name. It
+                is the key the HP import matches on and the identifier Coway
+                itself uses, so it is stated plainly rather than tucked into a
+                tooltip - and it is `null` for a public viewer, who has no
+                business holding an internal identifier. */}
             <p className="mt-1 text-sm break-words text-slate-500">
               {hm.office}
+              {hm.hmCode ? (
+                <>
+                  <span className="mx-2 text-slate-300" aria-hidden>
+                    ·
+                  </span>
+                  <span className="font-medium tabular-nums text-slate-700">
+                    HM Code {hm.hmCode}
+                  </span>
+                </>
+              ) : null}
             </p>
 
             <p className="mt-2 text-sm font-medium text-slate-900">

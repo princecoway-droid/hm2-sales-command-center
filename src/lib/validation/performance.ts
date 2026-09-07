@@ -36,9 +36,12 @@ import {
  *   `*Schema`       what a save must satisfy - every field present and in range.
  *                   This is the only schema a mutation is allowed to use.
  *
- * Two things deliberately absent, per the reporting rules:
+ * Three things deliberately absent, per the reporting rules:
  *   * No extrade/non-extrade percentages - those are computed for display.
  *   * No monthly Key-In field - the monthly total is SUM(weekly Key-In).
+ *   * No Active HP field - since Stage 8 it is COUNTED from the imported HP
+ *     rows rather than keyed in. The column survives on the table holding
+ *     pre-Stage-8 figures, and nothing writes it.
  */
 
 // -----------------------------------------------------------------------------
@@ -51,7 +54,6 @@ const monthlyPerformanceFields = {
   net_units: naturalNumber("Net units"),
   target_net_units: naturalNumber("Target net units"),
   recruitment: naturalNumber("Recruitment"),
-  active_hp: naturalNumber("Active HP"),
   /** Keyed in from Coway eTrust. Never calculated, never averaged. */
   shi_percentage: percentage("SHI"),
   extrade_units: naturalNumber("Extrade units"),

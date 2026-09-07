@@ -37,11 +37,19 @@ import type {
  * ---------------------------------------------------------------------------
  */
 
+/**
+ * The monthly figures the PA keys in.
+ *
+ * Active HP is deliberately not among them any more. Since Stage 8 it is
+ * COUNTED from the imported HP rows, so a box to type it into would be a second
+ * answer to a question the data already answers - and the two would disagree
+ * the first time somebody typed a number the spreadsheet did not support.
+ * See `/hp-import`.
+ */
 export const MONTHLY_FIELDS = [
   "net_units",
   "target_net_units",
   "recruitment",
-  "active_hp",
   "shi_percentage",
   "extrade_units",
   "non_extrade_units",
@@ -181,7 +189,6 @@ export type RowValues = {
   net_units: Entry;
   target_net_units: Entry;
   recruitment: Entry;
-  active_hp: Entry;
   shi_percentage: Entry;
   extrade_units: Entry;
   non_extrade_units: Entry;
@@ -230,7 +237,6 @@ export function toCompletenessRow(
     net_units: values.net_units,
     target_net_units: values.target_net_units,
     recruitment: values.recruitment,
-    active_hp: values.active_hp,
     shi_percentage: values.shi_percentage,
     extrade_units: values.extrade_units,
     non_extrade_units: values.non_extrade_units,
@@ -249,7 +255,6 @@ const FIELD_LABELS: Record<MonthlyField, string> = {
   net_units: "Net units",
   target_net_units: "Target",
   recruitment: "Recruitment",
-  active_hp: "Active HP",
   shi_percentage: "SHI",
   extrade_units: "Extrade units",
   non_extrade_units: "Non-Extrade units",

@@ -14,6 +14,7 @@ import type {
   PerformanceBundle,
 } from "@/lib/view-models/monthly-performance";
 import type {
+  HmMonthlyHpSummary,
   HMMonthlyPerformance,
   HMWeeklyPerformance,
   Month,
@@ -34,7 +35,13 @@ import type {
  *   1. months + hms                          (parallel)
  *   2. sales_weeks + hm_monthly_performance  (parallel, `in` the wanted months)
  *      + group_monthly_metrics               (selected month only)
+ *      + hm_monthly_hp_summary               (`in` the wanted months)
  *   3. hm_weekly_performance                 (`in` every week id from step 2)
+ *
+ * Active HP is a COUNT, and it is counted in the database. The summary view
+ * returns one row per HM per month whatever the HP roster size, so a month of
+ * 150 HPs and a month of 15 cost the dashboard exactly the same - the HP rows
+ * themselves are never fetched by this page.
  *
  * Step 3 cannot join step 2: weekly Key-In is keyed by `week_id`, so the week
  * ids have to exist before it can be asked for. Splitting the records back out
@@ -43,6 +50,12 @@ import type {
  * Reads only - no writes, no service-role client, and RLS applies as the
  * signed-in user exactly as it does everywhere else in `lib/data/`.
  */
+
+/** The columns the dashboard reads off `hm_monthly_hp_summary`. */
+type HpSummaryRow = Pick<
+  HmMonthlyHpSummary,
+  "month_id" | "hm_id" | "hp_count" | "active_hp" | "hp_updated_at"
+>;
 
 export type DashboardData = {
   /** Every reporting month, newest first, for the month selector. */
@@ -127,8 +140,8 @@ export async function getDashboardData(
     )
     .map((month) => month.id);
 
-  // --- 2. weeks + monthly figures + group SHI --------------------------------
-  const [weeksResult, monthlyResult, groupResult] = await Promise.all([
+  // --- 2. weeks + monthly figures + group SHI + Active HP --------------------
+  const [weeksResult, monthlyResult, groupResult, hpResult] = await Promise.all([
     supabase
       .from("sales_weeks")
       .select("*")
@@ -140,6 +153,10 @@ export async function getDashboardData(
       .select("*")
       .eq("month_id", selectedMonth.id)
       .maybeSingle(),
+    supabase
+      .from("hm_monthly_hp_summary")
+      .select("month_id, hm_id, hp_count, active_hp, hp_updated_at")
+      .in("month_id", monthIds),
   ]);
 
   if (weeksResult.error) {
@@ -154,8 +171,13 @@ export async function getDashboardData(
     return err(readErrorMessage(groupResult.error));
   }
 
+  if (hpResult.error) {
+    return err(readErrorMessage(hpResult.error));
+  }
+
   const weeks = weeksResult.data ?? [];
   const monthly = monthlyResult.data ?? [];
+  const hpActive = hpResult.data ?? [];
 
   // --- 3. weekly Key-In ------------------------------------------------------
   let weekly: HMWeeklyPerformance[] = [];
@@ -180,11 +202,25 @@ export async function getDashboardData(
     months,
     selectedMonth,
     resolution,
-    lastUpdatedAt: latestUpdate(selectedMonth.id, weeks, monthly, weekly, groupResult.data),
+    lastUpdatedAt: latestUpdate(
+      selectedMonth.id,
+      weeks,
+      monthly,
+      weekly,
+      hpActive,
+      groupResult.data,
+    ),
     bundle: {
       selectedMonthId: selectedMonth.id,
       hms: hmsResult.data ?? [],
-      months: groupRecordsByMonth(months, monthIds, weeks, monthly, weekly),
+      months: groupRecordsByMonth(
+        months,
+        monthIds,
+        weeks,
+        monthly,
+        weekly,
+        hpActive,
+      ),
       groupShiPct: groupResult.data
         ? Number(groupResult.data.shi_percentage)
         : null,
@@ -208,6 +244,7 @@ function latestUpdate(
   weeks: readonly SalesWeek[],
   monthly: readonly HMMonthlyPerformance[],
   weekly: readonly HMWeeklyPerformance[],
+  hpActive: readonly HpSummaryRow[],
   groupMetrics: { updated_at: string } | null,
 ): string | null {
   const monthWeekIds = new Set(
@@ -221,6 +258,11 @@ function latestUpdate(
     ...weekly
       .filter((row) => monthWeekIds.has(row.week_id))
       .map((row) => row.updated_at),
+    // An HP import changes Active HP on this page, so it changes when the page
+    // says it was updated.
+    ...hpActive
+      .filter((row) => row.month_id === monthId)
+      .map((row) => row.hp_updated_at),
     ...(groupMetrics ? [groupMetrics.updated_at] : []),
   ].filter((stamp): stamp is string => typeof stamp === "string");
 
@@ -243,6 +285,7 @@ function groupRecordsByMonth(
   weeks: readonly SalesWeek[],
   monthly: readonly HMMonthlyPerformance[],
   weekly: readonly HMWeeklyPerformance[],
+  hpActive: readonly HpSummaryRow[],
 ): MonthPerformanceRecords[] {
   const wanted = new Set(monthIds);
 
@@ -278,6 +321,12 @@ function groupRecordsByMonth(
     weeklyByMonth.set(monthId, [...(weeklyByMonth.get(monthId) ?? []), row]);
   }
 
+  const hpByMonth = new Map<string, HpSummaryRow[]>();
+
+  for (const row of hpActive) {
+    hpByMonth.set(row.month_id, [...(hpByMonth.get(row.month_id) ?? []), row]);
+  }
+
   return months
     .filter((month) => wanted.has(month.id))
     .map((month) => ({
@@ -285,5 +334,9 @@ function groupRecordsByMonth(
       weeks: weeksByMonth.get(month.id) ?? [],
       monthly: monthlyByMonth.get(month.id) ?? [],
       weekly: weeklyByMonth.get(month.id) ?? [],
+      // An empty list, not `undefined`: the month WAS asked about, and nothing
+      // came back, which is exactly "no HP data imported". `hpActiveEntry`
+      // turns that into a blank Active HP rather than a zero.
+      hpActive: hpByMonth.get(month.id) ?? [],
     }));
 }

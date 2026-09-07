@@ -31,9 +31,16 @@ holding the link can open without an account. The public report is a
 *projection* of the dashboard's own view model, so the two cannot disagree about
 a figure.
 
-**Stage 7 (this build)** is the V1 hardening pass — no new features. HTTP
-security headers, the sales-week cascade closed at the database as well as in
-the action layer, and the deployment, backup and abuse notes below.
+**Stage 7** is the V1 hardening pass — no new features. HTTP security headers,
+the sales-week cascade closed at the database as well as in the action layer,
+and the deployment, backup and abuse notes below.
+
+**Stage 8 (this build)** makes the PA's Excel the input. They keep the
+spreadsheet they already maintain, upload it at `/hp-import`, and HP-level
+performance — W1–W4 Key-In, Total Key-In and the month's Total Net — lands
+against the right HM by **HM Code**. Active HP stops being a figure anybody
+types and becomes a count of those rows, so the number on the dashboard and the
+list behind it are the same fact. `/hp` is that list.
 
 ---
 
@@ -165,6 +172,7 @@ npm run dev
 | `npm run test:stage4` | Dashboard: month resolution, KPI/chart/card rendering, states |
 | `npm run test:stage5` | HM detail: one HM's month, and that it matches the dashboard |
 | `npm run test:stage6` | WhatsApp report, share tokens, the public projection |
+| `npm run test:stage8` | HP Excel import, Active HP, the HP listing, and the import against a real Postgres |
 | `npm run db:test` | Schema, constraint, trigger and RLS tests (no Docker) |
 | `npm test` | Every suite |
 | `npm run check` | typecheck → lint → tests → build |
@@ -183,16 +191,30 @@ so it is safe to run in CI on every change to `supabase/migrations`.
 ## Data model
 
 ```
-auth.users ──1:1──> profiles          manager | pa. HMs are NOT accounts.
+auth.users ──1:1──> profiles          manager | pa. HMs and HPs are NOT accounts.
 
-hms                                   HM master list (name, office, photo, status, order)
+hms             hm_code unique        HM master list (name, HM CODE, office, photo, status, order)
 months          (year, month) unique  quarter + label derived by trigger
   └── sales_weeks                     Coway's OFFICIAL weekly periods, per month
 
 hm_monthly_performance   (hm_id, month_id) unique
 hm_weekly_performance    (hm_id, week_id)  unique
 group_monthly_metrics    (month_id)        unique
+
+hps             hp_code unique        HP master list (HP CODE, name, current HM)
+hp_monthly_performance   (month_id, hp_id) unique   W1-W4, Total Key-In, Total Net
+hp_import_runs                        one row per successful Excel import
+
+views (security_invoker, so RLS applies to the caller)
+  hm_monthly_hp_summary               Active HP per HM per month - the ONLY source
+  hp_monthly_report                   one HP row with HP + HM identities joined
 ```
+
+**HM Code is the mapping key.** The Excel import matches every HP row to an HM
+on `hms.hm_code`, never on the name: names change, names are spelled three ways
+in three exports, and two Health Managers can legitimately share one. Both codes
+are uppercased and trimmed by a trigger, so `hm10321`, ` HM10321 ` and `HM10321`
+are one code however the PA typed it that morning.
 
 ### Rules the database enforces
 
@@ -206,6 +228,15 @@ group_monthly_metrics    (month_id)        unique
   SHI values.
 - **Monthly Key-In is not a column.** It is always `SUM(weekly keyin_units)`, so
   the monthly and weekly figures cannot drift apart.
+- **An HP's Total Key-In is `W1 + W2 + W3 + W4`,** enforced by a CHECK. The
+  spreadsheet carries its own TOTAL KEY-IN column and the import cross-checks
+  against it, but the figure that gets *stored* is always the calculated one.
+- **Active HP is counted, never keyed.** `COUNT` of that HM's HP rows for the
+  month whose Total Key-In is at least 1. `hm_monthly_performance.active_hp` is
+  retained holding pre-Stage-8 figures and is marked **deprecated**; nothing
+  reads it and nothing writes it.
+- **`total_net` is the MONTH's Net.** Not lifetime, not accumulated across
+  months, and not required to equal Total Key-In, Extrade or Non-Extrade.
 - **Sales weeks are not calendar weeks.** No 1–7 / 8–14 assumption anywhere; a
   month may have four, five or more periods, of any length.
 - **Quarter is derived**, not typed in: Jan–Mar Q1, Apr–Jun Q2, Jul–Sep Q3,
@@ -290,7 +321,9 @@ All sales figures are **units**. No RM anywhere in V1 KPIs.
 | **Achievement %** | `Net / Target × 100` |
 | **Net Ratio %** | `Net / Total Key-In × 100` |
 | **Recruitment** | New recruitment for that month only. Never cumulative, never carried forward. |
-| **Active HP** | Keyed in from eTrust: HPs with at least one net sale. **Never** derived from sales. |
+| **HP Total Key-In** | `W1 + W2 + W3 + W4` for one HP, one month. A blank weekly cell is 0 *for this dataset only* — the spreadsheet is a complete record of the month. |
+| **HP Total Net** | That HP's Net for the **current month**. Never lifetime, never cumulative. The historical spreadsheet heading "Accumulated Net" is read as this and the PA is warned. |
+| **Active HP** | HPs whose Total Key-In for the month is **>= 1**, counted from the imported HP rows. `null` — blank, never 0 — when no HP file has been imported for that HM and month. |
 | **SHI** | Keyed in from eTrust. **Never** calculated, never derived from other KPIs. |
 | **Extrade %** | `Extrade / Total Key-In × 100`. The denominator is **never** Net. |
 | **Non-Extrade %** | `Non-Extrade / Total Key-In × 100`. Same denominator. |
@@ -298,7 +331,9 @@ All sales figures are **units**. No RM anywhere in V1 KPIs.
 
 Group figures sum the HM figures — Key-In, Net, Target, Recruitment, Active HP,
 Extrade, Non-Extrade — and every group percentage is calculated **from those
-totals**, never by averaging HM percentages. The mean of four achievement
+totals**, never by averaging HM percentages. Group Active HP is therefore the
+sum of the per-HM counts, which is the sum of the HP rows underneath them: one
+chain, from a spreadsheet cell to the number on the dashboard. The mean of four achievement
 percentages silently weights a 20-unit target the same as a 200-unit one.
 
 Two balance functions exist and both are kept deliberately.
@@ -528,6 +563,20 @@ same reason the audit trigger keeps a client-supplied author when `auth.uid()`
 is null: those callers already bypass RLS entirely, so refusing them would break
 `db reset` while protecting nothing.
 
+**The HP import.** `import_hp_month` is deliberately **not** `SECURITY DEFINER`:
+every statement inside it runs as the caller under the Stage 8 policies. A PA
+can import because the policies say a PA may write those tables, not because the
+function elevates them. It validates the entire payload before the first INSERT
+and raises with a stable `hp_import_*` prefix that `mapDatabaseError()` turns
+into something a PA can act on, so a direct call to PostgREST is refused for the
+same reasons and with the same wording as the UI would give.
+
+The upload itself is untrusted input: size is checked before the bytes are read,
+each inflated part is capped before *and* after inflating, and rows and columns
+have ceilings. `anon` has no privilege on `hps`, `hp_monthly_performance`,
+`hp_import_runs` or either view, and both views are `security_invoker`, so RLS
+applies to the caller rather than to the view's owner.
+
 **The public share boundary.** Stage 6 introduces the only unauthenticated view
 of business data in the application, and it is drawn in the database rather than
 in the app. `anon` has no table privileges and no policy anywhere; it may execute
@@ -725,13 +774,16 @@ panel.
 src/
   app/
     (auth)/            login, no-access        — unauthenticated
-    (app)/             dashboard, data-entry, hm-management, settings
+    (app)/             dashboard, data-entry, hp, hp-import, hm-management,
+                       settings
     share/[token]/     the read-only month report — unauthenticated, no shell
   components/
     ui/                button, card, field, select, alert, badge, modal,
                        page-header, status colours
     layout/            app shell, nav, sign-out
     hm/                avatar, management table, form, photo uploader
+    hp/                listing table (cards on a phone), filters, pagination,
+                       the Excel import workspace
     data-entry/        workspace, month selector, calendar editor,
                        performance grid, cell, group SHI, status, save bar
     dashboard/         header, month switcher, refresh, KPI cards, target
@@ -747,6 +799,7 @@ src/
     auth/              session guards + sign-in/out actions
     calculations/      THE KPI ENGINE — pure, no Supabase, no React
       performance.ts     primitives: totals, ratios, status bands, blank/zero
+      hp.ts              HP Total Key-In, the active threshold, the counts
       inputs.ts          normalization: database rows -> calculation inputs
       hm.ts              the HM monthly model + the weekly model
       group.ts           group aggregation + data completeness
@@ -757,15 +810,19 @@ src/
                                                and one HM's month on its own
                        dashboard.ts            group model -> what the screen shows
                        hm-detail.ts            one HM's model -> their screen
+                       hp-listing.ts           one page of HP rows -> the table
                        public-share.ts         dashboard model -> what a public
                                                viewer may see (a projection)
+    import/            xlsx.ts       a small .xlsx reader - ZIP + two XML scans
+                       hp-import.ts  sheet -> validated preview -> commit payload
     reports/           whatsapp.ts  the view model -> plain text, pure
     share/             token.ts (CSPRNG + shape gate), config.ts (expiry policy),
                        resolve.ts (the RPC payload -> a public report, pure),
                        origin.ts (the app's own address, server-only)
     data/              read access, returns Result<T> instead of throwing
-                       dashboard.ts fetches a month + previous + QTD in 6 queries
+                       dashboard.ts fetches a month + previous + QTD in 7 queries
                        hm-detail.ts reads that same bundle — no query of its own
+                       hp.ts        the paged HP listing and the import context
                        share.ts     link management, and the one public read
     data-entry/        the editable grid model — pure, framework-free
     supabase/          browser / server / admin / proxy clients
@@ -779,7 +836,8 @@ src/
   proxy.ts             session refresh + auth redirects (Next 16 middleware)
 
 supabase/
-  migrations/          schema, RLS, storage, sales-week overlap, share links
+  migrations/          schema, RLS, storage, sales-week overlap, share links,
+                       HM Code, HP tables + views, the atomic import function
   tests/               schema rule tests
   seed.sql             local dev only
 
@@ -790,7 +848,10 @@ tests/
   stage4.test.mts      Stage 4 — the dashboard
   stage5.test.mts      Stage 5 — the HM detail screen
   stage6.test.mts      Stage 6 — the WhatsApp report and the public share view
+  stage8.test.mts      Stage 8 — the HP Excel import, Active HP, the HP listing
   fixtures.mts         declarative month/roster builders, Stage 3 onwards
+  xlsx-fixture.mts     a minimal .xlsx WRITER, so the reader is tested against
+                       a real ZIP with real shared strings — tests only
 ```
 
 ### Patterns worth following
@@ -1016,11 +1077,123 @@ login, and revoking the link closes both pages in the same instant.
 
 ---
 
+## HP: the Excel import and the listing
+
+`/hp-import` — the PA updates their spreadsheet as usual and uploads it here.
+`/hp?month=2026-09&active=1` — what went in, read-only.
+
+The point of this stage is not to replace the PA's Excel. It is to make the
+Excel the **input**, so the same figures stop being keyed in a second time by
+hand.
+
+### The pipeline
+
+```
+upload -> readXlsx -> buildHpImportPreview -> [ PA looks ] -> import_hp_month
+          ZIP+XML     pure, no database                        one transaction
+```
+
+Two Server Actions, and neither of them is the boundary. `import_hp_month`
+re-runs every check as the caller under RLS, so a direct POST to PostgREST meets
+the same rules with the same messages. What the actions buy is the *wording*:
+"row 18 — Unknown HM Code: HM99999" instead of a database error.
+
+### There is no partial import
+
+PostgREST gives every statement its own transaction, so creating the new HPs,
+rewriting the month and recording the run would be three independent commits —
+and a failure between them would leave a month half imported, which is a state a
+PA has no way to diagnose or undo. `import_hp_month` is a plpgsql function: one
+statement to the client, one transaction to the database. An import lands
+completely or not at all, and a rejected one does not even leave the HP master
+records it would have created.
+
+### Two totals, one of them authoritative
+
+The spreadsheet has a TOTAL KEY-IN column, kept because the PA reads it. The
+importer computes its own from W1–W4 and treats a disagreement as an **error**
+rather than preferring one: a mismatch means the file's weeks and its total
+describe different months, and the honest answer is to name the row and let the
+PA look. What gets stored is always the calculated figure, and a database CHECK
+refuses any other.
+
+### What an import will not do
+
+| Case | Behaviour |
+|---|---|
+| HM Code not in `hms` | **Rejected.** An import never creates an HM — an unrecognised code is far more likely to be a typo than a new hire. |
+| HP Code not in `hps` | **Created automatically.** The PA never has to add an HP by hand. |
+| HP Code appears twice in one file | **Rejected**, with every offending row named. Merging silently would make the month depend on row order. |
+| HP present last month, absent this month | **Kept.** No destructive cleanup based on absence from an upload. |
+| A reactivated HP with a NEW code | A **new** HP. There is deliberately no merge path between two codes. |
+| HP renamed, or moved to another HM | Both follow the file. Previous months keep their own `hm_id`, so nothing historical moves with it. |
+| A second import of the same month | Rewrites the rows it contains. Other months are untouched — an import targets exactly one `month_id`. |
+
+### Active HP became a derived figure
+
+Before Stage 8, Active HP was a number the PA typed into the grid. It is now
+counted: `COUNT` of that HM's HP rows for the month with `total_key_in >= 1`,
+taken from `hm_monthly_hp_summary` and read from nowhere else. Three
+consequences worth knowing:
+
+- **Data Entry no longer offers the field.** A box to type it into would be a
+  second answer to a question the data already answers, and the two would
+  disagree the first time somebody typed a number the spreadsheet did not
+  support.
+- **`hm_monthly_performance.active_hp` is deprecated, not dropped.** It still
+  holds whatever was keyed in before Stage 8, because dropping a column destroys
+  data. The grid's save omits it entirely — PostgREST builds its
+  `ON CONFLICT DO UPDATE SET` list from the keys sent, so a column nobody sends
+  is neither overwritten nor invented.
+- **A month with no HP import shows `—`, not `0`.** Nobody has said anything
+  about that month's HPs yet, and "0 active" would be a claim rather than a
+  blank. An HM *with* HP rows and none of them active does show a real `0`; the
+  `hp_count` that travels with the count is what separates the two.
+
+The dashboard's Active HP tile and every HM card's Active HP figure are links
+into `/hp`, carrying the month, the HM and the active filter — so the number and
+the list behind it cannot disagree about what was clicked.
+
+### Why the .xlsx reader is ours
+
+`src/lib/import/xlsx.ts` is about two hundred lines: a ZIP central-directory
+walk, `node:zlib` for the deflated parts, and two XML scans. The file it has to
+read has nine text-and-number columns, no formulas, no dates and no styling that
+matters.
+
+The alternatives were worse rather than merely larger. The widely-known `xlsx`
+release on npm is the pre-fork one carrying published prototype-pollution and
+ReDoS advisories, and a full workbook framework brings a dependency tree and an
+API surface far past "read the first sheet as text" for a 30 KB file.
+
+The upload is untrusted, so every limit is real: 5 MB on the file, a cap on each
+inflated part checked *before* inflating and again against what came out, and
+ceilings on rows and columns. Sparse cells are addressed by their `r="C4"`
+reference rather than by position — without that, a row with a blank HP CODE
+would shift every later column left and quietly import the Net as the Total.
+
+### The public report
+
+A share token still cannot reach an HP row. `resolve_share_report` carries
+Active HP as an **aggregate count per HM** — `{hm_id, hp_count, active_hp}` —
+which is what the public page already showed before Stage 8; only its source
+changed. The HM Code and the link into `/hp` are stripped from the public HM
+model rather than merely left unrendered, so no future component can start
+showing either by accident.
+
+---
+
 ## Not built yet
 
-HM logins, historical dashboard UI, advanced
+HM logins, HP logins, historical dashboard UI, advanced
 filtering, notifications, forecasting, AI recommendations, commission, PDF or
 image export, scheduled sending and any WhatsApp API integration.
+
+Deliberately **not** built, and not an oversight: there is no weekly incentive
+calculator, target engine, threshold, forecast or status badge anywhere in the
+HP data. W1–W4 exist because the PA's spreadsheet already carries them and
+because an HM can read momentum off them — they are performance detail, not an
+input to a calculation the business has not defined.
 
 Each of those consumes `buildMonthlyPerformanceViewModel()` or
 `buildHmPerformanceViewModel()` and formats what it returns. None of them

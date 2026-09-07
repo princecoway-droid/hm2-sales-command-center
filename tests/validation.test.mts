@@ -69,7 +69,6 @@ const balanced = {
   net_units: 40,
   target_net_units: 50,
   recruitment: 3,
-  active_hp: 12,
   shi_percentage: 87.5,
   extrade_units: 24,
   non_extrade_units: 16,
@@ -256,8 +255,35 @@ check(
 );
 check(
   "HM photo_url empty string normalised to null",
-  hmSchema.safeParse({ name: "A", office: "KL", status: "active", photo_url: "" }).data
-    ?.photo_url === null,
+  hmSchema.safeParse({
+    name: "A",
+    hm_code: "HM10321",
+    office: "KL",
+    status: "active",
+    photo_url: "",
+  }).data?.photo_url === null,
+);
+check(
+  "HM requires an HM Code - the Excel import matches on it",
+  !hmSchema.safeParse({ name: "A", office: "KL", status: "active" }).success,
+);
+check(
+  "an HM Code is uppercased on the way in, as the database would store it",
+  hmSchema.safeParse({
+    name: "A",
+    hm_code: " hm10321 ",
+    office: "KL",
+    status: "active",
+  }).data?.hm_code === "HM10321",
+);
+check(
+  "an HM Code with a space in it is rejected",
+  !hmSchema.safeParse({
+    name: "A",
+    hm_code: "HM 10321",
+    office: "KL",
+    status: "active",
+  }).success,
 );
 check(
   "invalid email rejected",

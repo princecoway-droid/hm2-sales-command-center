@@ -62,6 +62,19 @@ export {
   type SplitPercentages,
 } from "@/lib/calculations/performance";
 
+// HP-level figures - the Total Key-In sum, the active threshold, the counts.
+export {
+  calculateHpTotalKeyIn,
+  hpActiveEntry,
+  indexHpActiveByHm,
+  isHpActive,
+  summariseHpRows,
+  HP_ACTIVE_THRESHOLD,
+  type HpActiveRecord,
+  type HpMonthTotals,
+  type HpTotalsRow,
+} from "@/lib/calculations/hp";
+
 // Normalization - database rows in, calculation inputs out.
 export {
   buildHmMonthInput,
