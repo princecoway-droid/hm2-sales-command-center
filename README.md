@@ -427,8 +427,19 @@ tie-break, and names the affected KPIs and nothing more. Nothing is stored: the
 bands are derived at render time from data already loaded, and no query was
 added for them.
 
-The shared report is **not** extended by any of this. A token holder sees the
-same figures they always saw, with no bands attached.
+**The shared report carries the bands too.** They were withheld from it at
+first, on the reading that this was a management view; the business decided
+otherwise, and the reasoning is hard to argue with — the HM opening their own
+card from the WhatsApp link is exactly the person who needs to know which of
+their four figures is behind. Nothing new is exposed: every band is derived from
+Net, Key-In, Recruitment, Active HP and the target, all of which that report
+already prints.
+
+What the shared report does **not** get is the Management Attention section —
+who else is behind is a management conversation, not something to post to the
+group — or the HM Code, which is an internal identifier and stays stripped by
+`audience: "public"`. Those are separate decisions from the bands, and they stay
+answered separately.
 
 ### Group SHI is read, never derived
 
@@ -1232,11 +1243,18 @@ group entirely, so the authenticated shell has no code path that could render fo
 an anonymous visitor. Its "Updated" stamp is the data's own, computed in SQL from
 the month's rows, never the render clock.
 
-Each HM card opens that HM's own read-only page at `/share/<token>/hm/<hmId>` —
+Each HM card carries the four
+[KPI pacing bands](#kpi-status-a-pacing-indicator-not-a-forecast) under its four
+figures, and opens that HM's own read-only page at `/share/<token>/hm/<hmId>` —
 the same sections, the same components and the same figures as the manager's
 `/hm/<id>` screen, for the month the token names, with no month switcher and no
 way out of the token except back to the report. `/hm/<id>` itself stays behind
 login, and revoking the link closes both pages in the same instant.
+
+The bands are the reason to send an HM the link at all: "Net 18, Needs
+Attention" is something they can act on, where "Net 18" is a number they have to
+interpret. What the shared side still does not carry is the Management Attention
+list — who *else* is behind is a management conversation — or the HM Code.
 
 ---
 

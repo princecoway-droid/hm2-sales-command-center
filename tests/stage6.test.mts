@@ -132,25 +132,25 @@ const section = (title: string) => console.log(`\n${title}`);
 // -----------------------------------------------------------------------------
 
 /**
- * An HM detail model with the Stage 9 KPI bands stripped.
+ * The HM detail model reduced to the parts BOTH audiences must share.
  *
- * The public HM view carries none of them - they are a management view, and
- * Stage 9 did not extend the shared report - so the whole-model equalities
- * below normalise them away and then assert their absence separately, the same
- * way they already handle the HM Code and the private HP link.
+ * Only two things differ, and both are deliberate: the HM Code, which is an
+ * internal identifier a WhatsApp recipient has no business holding, and the
+ * Active HP link, which points at a list behind a login on one side and under
+ * the token on the other.
+ *
+ * The Stage 9 KPI bands are NOT in that list. They were withheld from the
+ * shared report at first; the business decided the HM opening their own card
+ * from the link is exactly who needs to see which figure is behind, and the
+ * bands expose nothing the report does not already print.
  */
-const withoutKpiStatus = (detail: HmDetailViewModel): HmDetailViewModel => ({
-  ...detail,
-  kpiStatuses: null,
-  currentWeekLabel: null,
-  net: { ...detail.net, kpiStatus: null },
-  keyIn: { ...detail.keyIn, kpiStatus: null },
-  netRatio: { ...detail.netRatio, kpiStatus: null },
-  weekly: {
-    ...detail.weekly,
-    weeks: detail.weekly.weeks.map((week) => ({ ...week, kpiStatus: null })),
-  },
-});
+const comparableDetail = (detail: HmDetailViewModel): string =>
+  JSON.stringify({
+    ...detail,
+    backHref: null,
+    hm: { ...detail.hm, hmCode: null },
+    secondary: detail.secondary.map((metric) => ({ ...metric, href: null })),
+  });
 
 const SHARE_URL = "https://hm2.example.com/share/EXAMPLE-TOKEN";
 
@@ -2491,43 +2491,22 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
         lastUpdatedAt: hmPayload.lastUpdatedAt,
       });
 
-      const withoutBack = (detail: HmDetailViewModel) =>
-        JSON.stringify({ ...detail, backHref: null });
-
-      /**
-       * The two views, reduced to the parts that must be identical.
-       *
-       * Stage 8 gave the private screen two things the public one deliberately
-       * does not get: the HM Code, and a link into `/hp` that a token holder
-       * cannot open. Stage 9 added a third, for the same reason: the KPI
-       * pacing bands are a management view, and the shared report was not
-       * extended by them. Those are the ONLY differences allowed, so they are
-       * normalised away here and asserted separately below - rather than the
-       * comparison being loosened to "mostly equal".
-       */
-      const comparable = (detail: HmDetailViewModel) =>
-        withoutBack({
-          ...withoutKpiStatus(detail),
-          hm: { ...detail.hm, hmCode: null },
-          secondary: detail.secondary.map((metric) => ({
-            ...metric,
-            href: null,
-            kpiStatus: null,
-          })),
-        });
-
       check(
         "every figure on the public HM view equals the private HM screen's, across a real database",
-        comparable(publicHm) === comparable(privateHm),
+        comparableDetail(publicHm) === comparableDetail(privateHm),
       );
 
       check(
-        "and the shared report carries no Stage 9 KPI bands, while the private screen does",
-        publicHm.kpiStatuses === null &&
-          publicHm.currentWeekLabel === null &&
-          publicHm.secondary.every((metric) => !metric.kpiStatus) &&
-          publicHm.weekly.weeks.every((week) => !week.kpiStatus) &&
-          privateHm.kpiStatuses !== null,
+        "and that includes the Stage 9 KPI bands, which the shared report now carries",
+        publicHm.kpiStatuses !== null &&
+          publicHm.currentWeekLabel === privateHm.currentWeekLabel &&
+          JSON.stringify(publicHm.kpiStatuses) ===
+            JSON.stringify(privateHm.kpiStatuses) &&
+          publicHm.weekly.weeks.every(
+            (week, index) =>
+              JSON.stringify(week.kpiStatus) ===
+              JSON.stringify(privateHm.weekly.weeks[index]?.kpiStatus),
+          ),
       );
 
       check(
@@ -2560,7 +2539,7 @@ section("[23] end to end: a real token, a real Postgres, the real pipeline");
           !serialisedHm.includes("updated_by") &&
           // The back link is the one place the token belongs: it is how the
           // reader returns to the report they came from. Nowhere else.
-          !withoutBack(publicHm).includes(replacement),
+          !JSON.stringify({ ...publicHm, backHref: null }).includes(replacement),
       );
     }
   }
@@ -3275,28 +3254,9 @@ section("[26] the public HM view is the private HM screen, minus the session");
   check("the payload builds a public HM view", publicDetail !== null);
 
   if (publicDetail) {
-    const withoutBack = (detail: HmDetailViewModel) =>
-      JSON.stringify({ ...detail, backHref: null });
-
-    // The HM Code and the link into `/hp` are the two things Stage 8 gives the
-    // private screen and deliberately withholds from a token holder; Stage 9
-    // added the KPI pacing bands as a third. They are normalised out here and
-    // asserted on their own below, so this stays a real whole-object equality
-    // rather than a loosened one.
-    const comparable = (detail: HmDetailViewModel) =>
-      withoutBack({
-        ...withoutKpiStatus(detail),
-        hm: { ...detail.hm, hmCode: null },
-        secondary: detail.secondary.map((metric) => ({
-          ...metric,
-          href: null,
-          kpiStatus: null,
-        })),
-      });
-
     check(
       "every figure on it equals the private HM screen's, whole model",
-      comparable(publicDetail) === comparable(privateDetail),
+      comparableDetail(publicDetail) === comparableDetail(privateDetail),
     );
 
     check(
@@ -3306,11 +3266,11 @@ section("[26] the public HM view is the private HM screen, minus the session");
     );
 
     check(
-      "and no Stage 9 KPI band, which is a management view rather than a shared one",
-      publicDetail.kpiStatuses === null &&
-        publicDetail.currentWeekLabel === null &&
-        publicDetail.weekly.weeks.every((week) => !week.kpiStatus) &&
-        privateDetail.kpiStatuses !== null,
+      "and it DOES carry the Stage 9 KPI bands - the HM reading the link needs them",
+      publicDetail.kpiStatuses !== null &&
+        publicDetail.currentWeekLabel !== null &&
+        (publicDetail.keyIn.kpiStatus?.label.length ?? 0) > 0 &&
+        publicDetail.weekly.weeks.some((week) => week.kpiStatus),
     );
 
     // Named individually as well, because a whole-object equality that breaks

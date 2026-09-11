@@ -214,9 +214,12 @@ export type HmDetailViewModel = {
    * The metrics above carry the same models on the tiles that show them; this
    * is the same set gathered together, so a caller that wants the statuses
    * without reading four tiles has them, and every one of them is the
-   * dashboard's - not a second calculation. `null` on the public view.
+   * dashboard's - not a second calculation.
+   *
+   * Present for BOTH audiences: the HM reading the shared link is the person
+   * who most needs to know which figure is behind. See the assembly below.
    */
-  kpiStatuses: HmKpiStatusModels | null;
+  kpiStatuses: HmKpiStatusModels;
   /** "W2", the week the Key-In band was taken from, or `null`. */
   currentWeekLabel: string | null;
 
@@ -385,7 +388,7 @@ function buildSalesMix(hm: HMMonthlyCalculatedPerformance): HmSalesMixModel {
 function buildSecondary(
   hm: HMMonthlyCalculatedPerformance,
   hpListingHref: string | null,
-  kpiStatuses: HmKpiStatusModels | null,
+  kpiStatuses: HmKpiStatusModels,
 ): HmMetricModel[] {
   const recruitment = unitsLabel(hm.recruitment);
 
@@ -495,24 +498,26 @@ export function buildHmDetailViewModel({
   const hasTarget = hm.targetNetUnits !== null && hm.targetNetUnits > 0;
   const keyIn = hm.presence.weeksEntered > 0 ? formatUnits(hm.totalKeyIn) : NO_VALUE;
 
-  // Stage 9 is a management view, and the shared report is not being extended
-  // by it: a public viewer sees the same figures they have always seen, with no
-  // bands attached. Decided here rather than in the components, so no future
-  // card can start rendering one by accident.
-  const showKpiStatus = audience !== "public";
+  // The bands are shown to BOTH audiences.
+  //
+  // They were private at first, on the reading that Stage 9 was a management
+  // view. The business decided otherwise: an HM opening their own card from the
+  // WhatsApp link is the person who most needs to know which of their figures
+  // is behind, and being told "Needs Attention" on recruitment is the point of
+  // sending them the link at all.
+  //
+  // It exposes nothing new either way - every band is derived from figures this
+  // report already carries: Net, Key-In, Recruitment, Active HP and the target.
+  // `audience` still strips the HM Code, which IS an internal identifier; that
+  // is a different question and stays answered differently.
+  const kpiStatuses: HmKpiStatusModels = buildHmKpiStatusModels(
+    model.kpiStatuses,
+    hm.netRatioPct,
+  );
 
-  const kpiStatuses: HmKpiStatusModels | null = showKpiStatus
-    ? buildHmKpiStatusModels(model.kpiStatuses, hm.netRatioPct)
-    : null;
-
-  const weeklyKpiByWeekId: ReadonlyMap<string, WeeklyKeyInKpiStatus> =
-    showKpiStatus
-      ? new Map(
-          model.kpiStatuses.weekly.map(
-            (week) => [week.weekId, week] as const,
-          ),
-        )
-      : new Map();
+  const weeklyKpiByWeekId: ReadonlyMap<string, WeeklyKeyInKpiStatus> = new Map(
+    model.kpiStatuses.weekly.map((week) => [week.weekId, week] as const),
+  );
 
   return {
     hm: {
@@ -619,9 +624,7 @@ export function buildHmDetailViewModel({
 
     secondary: buildSecondary(hm, hpListingHref, kpiStatuses),
     kpiStatuses,
-    currentWeekLabel: showKpiStatus
-      ? (model.currentWeek?.week.weekLabel ?? null)
-      : null,
+    currentWeekLabel: model.currentWeek?.week.weekLabel ?? null,
     weekly: buildWeekly(hm, weeklyKpiByWeekId),
     salesMix: buildSalesMix(hm),
     previousMonthNet: buildMonthOverMonthModel(model.previousMonthNet),

@@ -37,9 +37,13 @@
  *                 by red count then by the dashboard's own ranking, and says
  *                 something positive rather than nothing when it is empty.
  *
- *   the ABSENCES  that no overall score exists anywhere in the models, that the
- *                 deprecated Active HP column cannot influence a band, and that
- *                 the shared report was not extended with any of this.
+ *   the ABSENCES  that no overall score exists anywhere in the models, and that
+ *                 the deprecated Active HP column cannot influence a band.
+ *
+ *   the SHARE     that the bands DO reach the shared report - the HM opening
+ *                 their own card from the WhatsApp link needs them - while the
+ *                 HM Code still does not, and no Management Attention section
+ *                 follows them there.
  */
 
 import { readFileSync } from "node:fs";
@@ -1615,26 +1619,40 @@ section("[S9-P] the reporting clock, and the shape of the whole model");
   );
 
   check(
-    "and the public view of the same HM carries none of them",
+    "and the public view of the same HM carries the SAME ones",
+    // The shared report shows the bands too: the HM opening their own card from
+    // the WhatsApp link is exactly who needs to know which figure is behind,
+    // and a band exposes nothing the report does not already print. What
+    // `audience: "public"` still strips is the HM Code - an internal
+    // identifier, which is a different question.
     (() => {
-      const publicDetail = buildHmDetailViewModel({
-        selectedMonth: september.month,
-        model: buildHmPerformanceViewModel(
-          bundleOf(roster, [september], september),
-          hmId(roster, "Alpha"),
-          { today: "2026-09-08" },
-        )!,
-        lastUpdatedAt: null,
-        audience: "public",
-      });
+      const forAudience = (audience: "private" | "public") =>
+        buildHmDetailViewModel({
+          selectedMonth: september.month,
+          model: buildHmPerformanceViewModel(
+            bundleOf(roster, [september], september),
+            hmId(roster, "Alpha"),
+            { today: "2026-09-08" },
+          )!,
+          lastUpdatedAt: null,
+          audience,
+        });
+
+      const publicDetail = forAudience("public");
+      const privateDetail = forAudience("private");
 
       return (
-        publicDetail.kpiStatuses === null &&
-        publicDetail.currentWeekLabel === null &&
-        publicDetail.keyIn.kpiStatus === null &&
-        publicDetail.net.kpiStatus === null &&
-        publicDetail.weekly.weeks.every((week) => week.kpiStatus === null) &&
-        publicDetail.secondary.every((metric) => !metric.kpiStatus)
+        JSON.stringify(publicDetail.kpiStatuses) ===
+          JSON.stringify(privateDetail.kpiStatuses) &&
+        publicDetail.currentWeekLabel === privateDetail.currentWeekLabel &&
+        publicDetail.keyIn.kpiStatus?.status === "needs_attention" &&
+        publicDetail.weekly.weeks[0]!.kpiStatus?.label === "Needs Attention" &&
+        publicDetail.secondary.every((metric) =>
+          metric.key === "shi" ? true : Boolean(metric.kpiStatus),
+        ) &&
+        // The identifier is still withheld.
+        publicDetail.hm.hmCode === null &&
+        privateDetail.hm.hmCode !== null
       );
     })(),
   );
@@ -1735,6 +1753,45 @@ section("[S9-Q] the REAL routes render the bands, not just the models");
   check(
     "showing ONE verdict per figure - the Stage 9 band wins where both exist",
     metric.includes("kpiStatus === null && metric.status !== null"),
+  );
+
+  // --- the shared report -----------------------------------------------------
+  const shareCard = source("components/share/share-hm-card.tsx");
+
+  for (const kpi of ["keyIn", "net", "recruitment", "activeHp"] as const) {
+    check(
+      `the shared HM card passes the ${kpi} band to a badge`,
+      shareCard.includes(`hm.statuses.${kpi}`),
+    );
+  }
+
+  check(
+    "the shared card renders the same badge component the dashboard card does",
+    shareCard.includes('from "@/components/ui/kpi-status"') &&
+      shareCard.includes("<KpiStatusBadge"),
+  );
+
+  check(
+    "and the public projection carries the bands across",
+    source("lib/view-models/public-share.ts").includes("statuses: hm.statuses"),
+  );
+
+  check(
+    "but NOT the Management Attention section - the group list is not the HM's business",
+    !shareCard.includes("ManagementAttention") &&
+      !source("components/share/public-report.tsx").includes(
+        "ManagementAttention",
+      ) &&
+      !source("lib/view-models/public-share.ts").includes(
+        "managementAttention",
+      ),
+  );
+
+  check(
+    "and the HM Code is still withheld from a token holder",
+    source("lib/view-models/hm-detail.ts").includes(
+      'audience === "public" ? null : hm.hmCode',
+    ),
   );
 
   // --- the weekly sections ---------------------------------------------------

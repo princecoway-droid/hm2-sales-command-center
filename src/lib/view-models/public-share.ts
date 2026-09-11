@@ -1,5 +1,8 @@
 import type { PerformanceStatus } from "@/lib/calculations";
-import type { DashboardViewModel } from "@/lib/view-models/dashboard";
+import type {
+  DashboardViewModel,
+  HmKpiStatusModels,
+} from "@/lib/view-models/dashboard";
 
 /**
  * The public presenter.
@@ -88,6 +91,18 @@ export type PublicHmCard = {
   activeHpLabel: string;
   /** False when nothing has been keyed in for them this month. */
   hasMonthlyRecord: boolean;
+  /**
+   * The four Stage 9 pacing bands, already in words.
+   *
+   * Carried across unchanged from the dashboard card, because they are the
+   * point of sending an HM the link: "Net 18, Needs Attention" tells them what
+   * to do on Monday in a way that "Net 18" does not.
+   *
+   * Nothing new is exposed - every band is derived from the four figures above
+   * plus the target, all of which this report already prints. The HM Code is
+   * still dropped, because that IS an internal identifier.
+   */
+  statuses: HmKpiStatusModels;
 };
 
 export type PublicCompleteness = {
@@ -200,6 +215,8 @@ export function buildPublicShareViewModel(
       recruitmentStatus: hm.recruitmentStatus,
       activeHpLabel: hm.activeHpLabel,
       hasMonthlyRecord: hm.hasMonthlyRecord,
+      // The dashboard's own bands, not a second banding of the same figures.
+      statuses: hm.statuses,
     })),
 
     // Carried across unchanged, names included. A half-entered month has to
