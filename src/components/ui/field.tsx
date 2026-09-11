@@ -39,10 +39,14 @@ export function Field({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         className={cn(
-          "block w-full rounded-md border-0 px-3 py-2 text-sm text-slate-900 shadow-sm",
-          "ring-1 ring-inset placeholder:text-slate-400",
-          "focus:ring-2 focus:ring-inset focus:ring-sky-600",
-          error ? "ring-red-400" : "ring-slate-300",
+          // 44px tall, like every other control on a screen a PA fills in on a
+          // phone. The surface is the same translucent white as the cards, so
+          // a field reads as part of the panel rather than as a hole in it.
+          "block min-h-11 w-full rounded-control border-0 bg-white/70 px-3 py-2 text-sm text-slate-900",
+          "shadow-[var(--shadow-control)] ring-1 ring-inset placeholder:text-slate-400",
+          "transition-[box-shadow,background-color] duration-150 ease-out",
+          "focus:bg-white focus:ring-2 focus:ring-inset focus:ring-sky-600",
+          error ? "ring-rose-400" : "ring-slate-900/12",
           className,
         )}
         {...props}
@@ -55,7 +59,7 @@ export function Field({
       ) : null}
 
       {error ? (
-        <p id={errorId} className="text-xs font-medium text-red-600">
+        <p id={errorId} className="text-xs font-medium text-rose-700">
           {error}
         </p>
       ) : null}

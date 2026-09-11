@@ -182,7 +182,7 @@ export function PhotoUploader({ hm, onDone }: PhotoUploaderProps) {
           accept={HM_PHOTO_MIME_TYPES.join(",")}
           disabled={busy}
           onChange={(event) => choose(event.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200"
+          className="block w-full cursor-pointer text-sm text-slate-600 file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-control file:border-0 file:bg-slate-900/[0.05] file:px-4 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-900/[0.08]"
         />
         <p className="text-xs text-slate-500">
           JPEG, PNG, WebP or AVIF, up to{" "}

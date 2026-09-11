@@ -15,7 +15,7 @@ type HmMetricProps = {
 };
 
 const VALUE_SIZES = {
-  hero: "text-4xl sm:text-5xl",
+  hero: "text-[2.5rem] leading-none sm:text-5xl",
   lead: "text-2xl sm:text-3xl",
   normal: "text-2xl",
 } as const;
@@ -55,13 +55,11 @@ export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
 
   const body = (
     <>
-      <p className="truncate text-[11px] font-medium uppercase tracking-wider text-slate-500">
-        {metric.label}
-      </p>
+      <p className="section-label truncate">{metric.label}</p>
 
       <p
         className={cn(
-          "mt-2 font-semibold tabular-nums leading-none text-slate-900",
+          "figure-num mt-2.5 font-semibold leading-none text-slate-900",
           VALUE_SIZES[emphasis],
         )}
       >
@@ -113,8 +111,7 @@ export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
 
   // `min-w-0` matters on both branches: a grid item sizes to its content by
   // default, so without it a long figure pushes the tile wider than its column.
-  const shell =
-    "flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm";
+  const shell = "glass-card flex min-w-0 flex-col px-4 py-4 sm:px-5";
 
   if (!metric.href) {
     return <div className={shell}>{body}</div>;
@@ -126,7 +123,7 @@ export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
       aria-label={`${metric.label}, ${metric.value} - open the HP list`}
       className={cn(
         shell,
-        "transition-colors hover:border-sky-300 hover:bg-sky-50/40",
+        "glass-interactive",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600",
       )}
     >

@@ -51,7 +51,7 @@ export function ShareHmCard({ hm, href = null }: ShareHmCardProps) {
     <article
       aria-label={`${hm.name}, ${hm.office}`}
       className={cn(
-        "rounded-lg border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4",
+        "glass-card p-3.5 sm:p-4",
         href
           ? "group relative transition-colors hover:border-sky-300 hover:bg-sky-50/30 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-200"
           : null,
@@ -62,11 +62,11 @@ export function ShareHmCard({ hm, href = null }: ShareHmCardProps) {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="text-sm font-semibold break-words text-slate-900">
+            <h3 className="text-[0.9375rem] font-semibold leading-snug tracking-tight break-words text-slate-900">
               {href ? (
                 <Link
                   href={href}
-                  className="outline-none after:absolute after:inset-0 after:rounded-lg group-hover:text-sky-900"
+                  className="outline-none after:absolute after:inset-0 after:rounded-card group-hover:text-sky-900"
                 >
                   {hm.name}
                   <span className="sr-only"> - open full performance</span>
@@ -81,7 +81,7 @@ export function ShareHmCard({ hm, href = null }: ShareHmCardProps) {
         </div>
 
         <span
-          className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600"
+          className="shrink-0 rounded-full bg-slate-900/[0.05] px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600 ring-1 ring-inset ring-slate-900/[0.06]"
           title="Rank by net units"
         >
           #{hm.rank}
@@ -170,7 +170,7 @@ function Figure({
 }: FigureProps) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
+      <dt className="section-label truncate">
         {label}
       </dt>
       <dd

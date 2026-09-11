@@ -49,10 +49,10 @@ export function HmDetailHeader({
   controls,
 }: HmDetailHeaderProps) {
   return (
-    <header className="space-y-4 border-b border-slate-200 pb-4">
+    <header className="space-y-4 border-b hairline pb-5">
       <Link
         href={backHref}
-        className="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-sky-700 hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
+        className="-ml-2 inline-flex min-h-11 items-center gap-1.5 rounded-control px-2.5 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-600/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600"
       >
         <span aria-hidden>←</span>
         {backLabel}
@@ -67,7 +67,7 @@ export function HmDetailHeader({
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h1 className="text-2xl font-semibold leading-tight tracking-tight break-words text-slate-900 sm:text-3xl">
+              <h1 className="text-2xl font-semibold leading-tight tracking-tight break-words text-slate-900 sm:text-[2rem]">
                 {hm.name}
               </h1>
 
@@ -97,9 +97,9 @@ export function HmDetailHeader({
               ) : null}
             </p>
 
-            <p className="mt-2 text-sm font-medium text-slate-900">
+            <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-slate-900">
               {month.label}
-              <span className="ml-2 text-xs font-normal text-slate-400">
+              <span className="rounded-full bg-slate-900/[0.05] px-2 py-0.5 text-[11px] font-medium text-slate-500 ring-1 ring-inset ring-slate-900/[0.06]">
                 {month.quarterLabel}
               </span>
             </p>

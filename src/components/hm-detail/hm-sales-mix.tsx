@@ -25,18 +25,15 @@ export function HmSalesMix({ salesMix }: HmSalesMixProps) {
   return (
     <section
       aria-labelledby="hm-sales-mix"
-      className="flex flex-col rounded-lg border border-slate-200 bg-white shadow-sm"
+      className="glass-panel flex flex-col"
     >
-      <header className="border-b border-slate-200 px-4 py-3">
-        <h2
-          id="hm-sales-mix"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-        >
+      <header className="border-b hairline px-4 py-3.5 sm:px-5">
+        <h2 id="hm-sales-mix" className="section-label">
           Sales mix
         </h2>
       </header>
 
-      <div className="flex flex-1 flex-col gap-4 px-4 py-4">
+      <div className="flex flex-1 flex-col gap-4 px-4 py-5 sm:px-5">
         {salesMix.hasSplit ? (
           <>
             <MixRow entry={salesMix.extrade} tone="sky" />
@@ -48,7 +45,7 @@ export function HmSalesMix({ salesMix }: HmSalesMixProps) {
           </p>
         )}
 
-        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-slate-100 pt-3 text-xs">
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t hairline-inner pt-3.5 text-xs">
           <span className="text-slate-500">Split balance:</span>
           {/* Slate, not amber, when the two do not meet: a split that does not
               come to the Key-In total is an ordinary state, not a fault. */}
@@ -78,7 +75,7 @@ function MixRow({
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <span className="text-sm font-medium text-slate-700">{entry.label}</span>
-        <span className="text-sm tabular-nums text-slate-600">
+        <span className="figure-num text-sm text-slate-600">
           <span className="font-semibold text-slate-900">
             {entry.unitsLabel}
           </span>{" "}
@@ -87,14 +84,16 @@ function MixRow({
       </div>
 
       <div
-        className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-100"
+        className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-900/[0.07]"
         role="img"
         aria-label={`${entry.label}: ${entry.unitsLabel} units, ${entry.percentageLabel} of total Key-In`}
       >
         <div
           className={cn(
-            "h-full rounded-full",
-            tone === "sky" ? "bg-sky-600" : "bg-slate-400",
+            "h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]",
+            tone === "sky"
+              ? "bg-gradient-to-r from-sky-600 to-sky-500"
+              : "bg-gradient-to-r from-slate-400 to-slate-300",
           )}
           style={{ width: `${entry.barPct ?? 0}%` }}
         />

@@ -42,17 +42,16 @@ export function ManagementAttention({
     <section
       aria-labelledby="management-attention"
       className={cn(
-        "rounded-lg border bg-white shadow-sm",
-        // Outlined in rose only when there is something in it. A permanently
-        // red-edged panel stops meaning anything by the second week.
-        attention.hasItems ? "border-rose-200" : "border-slate-200",
+        "glass-panel overflow-hidden",
+        // Marked in rose only when there is something in it, and marked with a
+        // hairline rather than a fill: this is an executive list of names, not
+        // a warning box. A permanently red-edged panel stops meaning anything
+        // by the second week.
+        attention.hasItems && "border-rose-500/25",
       )}
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3">
-        <h2
-          id="management-attention"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-        >
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b hairline px-4 py-3.5 sm:px-5">
+        <h2 id="management-attention" className="section-label">
           Management attention
         </h2>
 
@@ -72,16 +71,16 @@ export function ManagementAttention({
       </header>
 
       {!attention.hasItems ? (
-        <p className="px-4 py-6 text-center text-sm text-slate-500">
+        <p className="px-4 py-7 text-center text-sm text-slate-500">
           {attention.emptyMessage}
         </p>
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="divide-y divide-slate-900/[0.06]">
           {attention.items.map((item) => (
             <li key={item.hmId}>
               <Link
                 href={item.href}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 transition-colors hover:bg-rose-50/40 focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-sky-600"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3.5 transition-colors hover:bg-rose-500/[0.05] focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-sky-600 sm:px-5"
               >
                 <span
                   aria-hidden
@@ -92,7 +91,7 @@ export function ManagementAttention({
                 />
 
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold break-words text-slate-900">
+                  <span className="block text-sm font-semibold tracking-tight break-words text-slate-900">
                     {item.name}
                   </span>
                   <span className="block text-xs tabular-nums text-slate-500">

@@ -11,7 +11,7 @@ export function Card({ children, className }: CardProps) {
   return (
     <section
       className={cn(
-        "rounded-lg border border-slate-200 bg-white shadow-sm",
+        "glass-panel",
         className,
       )}
     >
@@ -28,9 +28,11 @@ type CardHeaderProps = {
 
 export function CardHeader({ title, description, action }: CardHeaderProps) {
   return (
-    <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+    <header className="flex flex-wrap items-start justify-between gap-4 border-b hairline px-5 py-4 sm:flex-nowrap">
       <div>
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <h2 className="text-sm font-semibold tracking-tight text-slate-900">
+          {title}
+        </h2>
         {description ? (
           <p className="mt-1 text-sm text-slate-500">{description}</p>
         ) : null}
@@ -41,5 +43,5 @@ export function CardHeader({ title, description, action }: CardHeaderProps) {
 }
 
 export function CardBody({ children, className }: CardProps) {
-  return <div className={cn("px-5 py-4", className)}>{children}</div>;
+  return <div className={cn("px-5 py-5", className)}>{children}</div>;
 }

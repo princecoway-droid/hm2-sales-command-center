@@ -164,7 +164,7 @@ export function WhatsAppReport({ month, monthLabel }: WhatsAppReportProps) {
             </>
           ) : null}
 
-          <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex justify-end gap-2 border-t hairline pt-4">
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Close
             </Button>
@@ -207,7 +207,7 @@ function ReportPreview({ text }: { text: string }) {
         rows={16}
         spellCheck={false}
         aria-label="WhatsApp report text"
-        className="w-full rounded-md border border-slate-300 bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-800 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-600"
+        className="w-full rounded-control border hairline bg-white/60 p-3.5 font-mono text-xs leading-5 text-slate-800 focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-sky-600"
       />
     </section>
   );
@@ -226,7 +226,7 @@ function ShareLinkPanel({
   pending: boolean;
 }) {
   return (
-    <section className="space-y-2 rounded-md border border-slate-200 bg-white p-3">
+    <section className="glass-card space-y-2 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Share link
@@ -251,7 +251,7 @@ function ShareLinkPanel({
         </Alert>
       ) : (
         <>
-          <p className="rounded border border-slate-200 bg-slate-50 px-2 py-1.5 font-mono text-[11px] break-all text-slate-700">
+          <p className="rounded-inner border hairline bg-white/60 px-2.5 py-1.5 font-mono text-[11px] break-all text-slate-700">
             {payload.shareUrl}
           </p>
 
@@ -266,7 +266,7 @@ function ShareLinkPanel({
               href={payload.shareUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center rounded-md bg-white px-3.5 py-2 text-sm font-medium text-slate-700 ring-1 ring-inset ring-slate-300 transition-colors hover:bg-slate-50"
+              className="glass-chrome inline-flex min-h-11 items-center justify-center rounded-control px-4 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/10 transition-colors hover:bg-white"
             >
               Open preview
             </a>
@@ -423,13 +423,13 @@ function ManageLinks({
   const counts = countShareLinks(links);
 
   return (
-    <details className="rounded-md border border-slate-200 bg-white">
+    <details className="glass-card">
       <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
         All share links ({counts.total}) &middot; {counts.active} active
         &middot; {counts.revoked} revoked
       </summary>
 
-      <div className="border-t border-slate-200 px-3 py-2">
+      <div className="border-t hairline px-3 py-2">
         {error ? (
           <p className="mb-2 text-xs text-red-700" role="alert">
             {error}

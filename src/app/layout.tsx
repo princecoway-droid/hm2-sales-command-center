@@ -19,7 +19,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-dvh bg-slate-50 text-slate-900 antialiased">
+      {/* The canvas itself is painted in `globals.css` - a soft neutral with a
+          very quiet atmospheric wash, which is what the translucent surfaces
+          throughout the application are translucent against. */}
+      <body className="min-h-dvh text-slate-900 antialiased">
         {children}
       </body>
     </html>

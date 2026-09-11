@@ -17,7 +17,7 @@ type HmNotFoundProps = {
 /** The id in the URL matches no HM. A stale bookmark, or a deleted record. */
 export function HmNotFoundState({ backHref }: HmNotFoundProps) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+    <div className="rounded-card border border-dashed border-slate-900/12 bg-white/55 px-6 py-12 text-center">
       <h1 className="text-base font-semibold text-slate-900">HM not found</h1>
 
       <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
@@ -51,7 +51,7 @@ export function HmNoDataState({ message, monthLabel, dataEntryHref }: NoDataProp
   return (
     <div
       role="status"
-      className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-4 text-sm"
+      className="rounded-card border border-dashed border-slate-900/12 bg-white/55 px-4 py-4 text-sm"
     >
       <p className="font-semibold text-slate-900">{message}</p>
 

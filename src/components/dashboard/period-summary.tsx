@@ -25,12 +25,9 @@ export function PeriodSummary({ monthOverMonth, qtd }: PeriodSummaryProps) {
   return (
     <section
       aria-labelledby="period-summary"
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      className="glass-panel flex flex-col gap-4 p-4 sm:p-5"
     >
-      <h2
-        id="period-summary"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+      <h2 id="period-summary" className="section-label">
         In context
       </h2>
 
@@ -44,7 +41,7 @@ export function PeriodSummary({ monthOverMonth, qtd }: PeriodSummaryProps) {
             <p className="mt-1 flex items-baseline gap-2">
               <span
                 className={cn(
-                  "text-2xl font-semibold tabular-nums leading-none",
+                  "figure-num text-2xl font-semibold leading-none",
                   monthOverMonth.direction === "up"
                     ? "text-emerald-700"
                     : monthOverMonth.direction === "down"
@@ -76,7 +73,7 @@ export function PeriodSummary({ monthOverMonth, qtd }: PeriodSummaryProps) {
         )}
       </div>
 
-      <div className="border-t border-slate-100 pt-3">
+      <div className="border-t hairline-inner pt-4">
         <p className="text-[11px] font-medium uppercase tracking-wider text-slate-400">
           {qtd.quarterLabel} to date
         </p>
@@ -84,7 +81,7 @@ export function PeriodSummary({ monthOverMonth, qtd }: PeriodSummaryProps) {
         <dl className="mt-1 grid grid-cols-2 gap-3">
           <div>
             <dt className="text-xs text-slate-500">Net</dt>
-            <dd className="text-xl font-semibold tabular-nums leading-tight text-slate-900">
+            <dd className="figure-num text-xl font-semibold leading-tight text-slate-900">
               {qtd.netLabel}
               <span className="ml-1 text-xs font-normal text-slate-400">
                 units
@@ -93,7 +90,7 @@ export function PeriodSummary({ monthOverMonth, qtd }: PeriodSummaryProps) {
           </div>
           <div>
             <dt className="text-xs text-slate-500">Recruitment</dt>
-            <dd className="text-xl font-semibold tabular-nums leading-tight text-slate-900">
+            <dd className="figure-num text-xl font-semibold leading-tight text-slate-900">
               {qtd.recruitmentLabel}
             </dd>
           </div>

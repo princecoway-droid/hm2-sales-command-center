@@ -207,7 +207,7 @@ export function WeeklyCalendarEditor({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b hairline text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
                 <th scope="col" className="py-2 pr-4 font-medium">
                   Week
                 </th>
@@ -228,7 +228,7 @@ export function WeeklyCalendarEditor({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-900/[0.06]">
               {rows.map((row, index) => {
                 const invalidRange = row.start_date > row.end_date;
 
@@ -245,7 +245,7 @@ export function WeeklyCalendarEditor({
                         onChange={(event) =>
                           update(index, { week_label: event.target.value })
                         }
-                        className="w-24 rounded-md border-0 px-2 py-1.5 text-sm shadow-sm ring-1 ring-inset ring-slate-300 focus:ring-2 focus:ring-inset focus:ring-sky-600"
+                        className="w-24 rounded-control border-0 bg-white/70 px-2.5 py-1.5 text-sm shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/12 focus:bg-white focus:ring-2 focus:ring-inset focus:ring-sky-600"
                       />
                     </td>
                     <td className="py-2 pr-4">

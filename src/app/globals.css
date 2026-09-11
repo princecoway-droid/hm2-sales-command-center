@@ -1,19 +1,103 @@
 @import "tailwindcss";
 
 /*
- * Stage 1 styling is deliberately plain - enough structure to read the shell
- * clearly, no design system yet. The dashboard visual language arrives with the
- * dashboard itself.
+ * =============================================================================
+ * The visual layer
+ * =============================================================================
  *
- * Light-only for now: this is an internal tool used on office screens, and a
- * half-considered dark palette would only have to be redone alongside the
- * charts.
+ * Stage 10 gave the application a design system it did not have before. It is
+ * deliberately small: a set of tokens, four surface classes and a handful of
+ * control classes. Everything else is still ordinary Tailwind in the component
+ * that needs it.
+ *
+ * The look is Apple-ish executive glass - a soft neutral canvas with a very
+ * quiet atmospheric wash, translucent surfaces that let it through, hairline
+ * borders, a lit top edge and soft layered shadows. Depth comes from those four
+ * things together rather than from any one of them being strong, which is what
+ * keeps a screen of thirty cards calm.
+ *
+ * Two rules this file exists to hold:
+ *
+ *   1. NOTHING HERE CARRIES MEANING. Status colour is decided in
+ *      `components/ui/status-styles.ts` against bands the engine produced. This
+ *      file styles surfaces, not verdicts.
+ *
+ *   2. GLASS NEVER COSTS LEGIBILITY. Every surface sits at 76-88% opacity over
+ *      a light canvas, so text on it keeps effectively the same contrast it had
+ *      on white. The blur is atmosphere; the opacity is what the type stands on.
+ *
+ * Light-only, still: the application has never had a dark theme, and Stage 10
+ * is not the stage to add one.
  */
+
 @theme inline {
+  /*
+   * The platform's own UI face first. On the iPhones and Macs this dashboard is
+   * mostly read on that is SF; on the office Windows machines, Segoe UI
+   * Variable. Both are already installed, so there is no web font to download
+   * and no layout shift while one arrives.
+   */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", monospace;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text",
+    "Segoe UI", ui-sans-serif, system-ui, Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono:
+    ui-monospace, "SF Mono", "SFMono-Regular", "Cascadia Code",
+    "Segoe UI Mono", monospace;
+}
+
+/*
+ * -----------------------------------------------------------------------------
+ * Tokens
+ * -----------------------------------------------------------------------------
+ * Plain custom properties rather than `@theme` entries, because these are
+ * multi-part recipes (a three-layer shadow, a blur-and-saturate pair) that are
+ * consumed by the classes below rather than turned into utilities.
+ *
+ * Vendor prefixes are never written by hand in this file: Lightning CSS adds
+ * whatever the browser targets need, and a hand-written `-webkit-` pair beside
+ * the standard property gets collapsed into the prefixed one alone - which is
+ * how the glass silently stopped blurring the first time.
+ */
+:root {
+  /* Radius. Three values, and components pick one - see the classes below. */
+  --radius-card: 1rem; /* 16px - cards, panels, section containers */
+  --radius-control: 0.625rem; /* 10px - buttons, inputs, selects */
+  --radius-inner: 0.5rem; /* 8px - things nested inside a card */
+
+  /* Glass. Opacity carries the legibility; blur only carries the atmosphere. */
+  --glass-panel-bg: rgb(255 255 255 / 0.76);
+  --glass-card-bg: rgb(255 255 255 / 0.82);
+  --glass-solid-bg: rgb(255 255 255 / 0.85);
+  --glass-blur: saturate(180%) blur(20px);
+  --glass-blur-soft: saturate(160%) blur(12px);
+
+  /* Hairlines. Slate-tinted rather than grey, so they sit in the palette. */
+  --hairline: rgb(15 23 42 / 0.08);
+  --hairline-strong: rgb(15 23 42 / 0.12);
+  --hairline-inner: rgb(15 23 42 / 0.06);
+
+  /*
+   * The lit top edge. One inset highlight is the difference between "a white
+   * box" and "a pane of glass", and it costs nothing.
+   */
+  --edge-light: inset 0 1px 0 rgb(255 255 255 / 0.9);
+
+  /*
+   * Shadows. Two soft slate-tinted layers - a tight one that seats the card on
+   * the canvas, and a wide diffuse one that lifts it. Never black: a black
+   * shadow on a cool grey canvas reads as dirt.
+   */
+  --shadow-card:
+    0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -14px rgb(15 23 42 / 0.14);
+  --shadow-panel:
+    0 1px 2px rgb(15 23 42 / 0.04), 0 16px 40px -24px rgb(15 23 42 / 0.18);
+  --shadow-lift:
+    0 2px 4px rgb(15 23 42 / 0.05), 0 18px 36px -16px rgb(15 23 42 / 0.2);
+  --shadow-control: 0 1px 2px rgb(15 23 42 / 0.06);
+
+  /* The accent, restrained. Sits between the existing sky-600 and sky-700. */
+  --accent: #0369a1;
 }
 
 html {
@@ -22,4 +106,210 @@ html {
 
 body {
   font-family: var(--font-sans);
+
+  /*
+   * The canvas.
+   *
+   * A light cool neutral with three quiet washes over it - one blue at the top
+   * left, one indigo at the top right, one teal below the fold.
+   *
+   * The canvas is deliberately a step DOWN from white rather than a shade of
+   * it. White surfaces on a near-white page read as one flat sheet with lines
+   * drawn on it; the separation between the two is what makes a card look like
+   * a card, and it is also the only thing that makes translucency visible at
+   * all. None of the washes passes 22%, which is enough to give the glass
+   * something to be translucent against and not enough to be read as a
+   * gradient.
+   *
+   * Fixed, so the wash belongs to the window rather than scrolling away and
+   * leaving the lower half of a long dashboard flat.
+   */
+  background-color: #e9edf6;
+  background-image:
+    radial-gradient(
+      1100px 620px at 10% -10%,
+      rgb(56 189 248 / 0.22),
+      transparent 62%
+    ),
+    radial-gradient(
+      980px 560px at 94% -4%,
+      rgb(129 140 248 / 0.16),
+      transparent 64%
+    ),
+    radial-gradient(
+      900px 520px at 48% 112%,
+      rgb(45 212 191 / 0.13),
+      transparent 62%
+    );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/*
+ * -----------------------------------------------------------------------------
+ * Surfaces
+ * -----------------------------------------------------------------------------
+ * Four of them, and a component picks one rather than assembling its own. That
+ * is the whole of what keeps eight KPI cards, twelve HM cards, a chart panel
+ * and a modal looking like one product.
+ *
+ * Registered as UTILITIES rather than as component classes, so a variant works
+ * on them: the navigation is a plain scrolling row on a phone and a glass panel
+ * only from `md` up, which is `md:glass-panel` and nothing else.
+ */
+
+/**
+ * A large container: a section panel, the chart, Management Attention, a
+ * modal. The strongest blur and the widest shadow, because these are the things
+ * the page is built out of.
+ */
+@utility glass-panel {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background-color: var(--glass-panel-bg);
+  box-shadow: var(--edge-light), var(--shadow-panel);
+  backdrop-filter: var(--glass-blur);
+}
+
+/**
+ * A repeated tile: a KPI card, an HM card, a metric. Lighter blur and a tighter
+ * shadow - thirty of these on one screen at panel strength would be both heavy
+ * to look at and heavy to paint.
+ */
+@utility glass-card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background-color: var(--glass-card-bg);
+  box-shadow: var(--edge-light), var(--shadow-card);
+  backdrop-filter: var(--glass-blur-soft);
+}
+
+/**
+ * For the few places something must sit on top of arbitrary page content rather
+ * than on the canvas - the sticky app header, the data-entry save bar, a
+ * secondary button. More opaque, because what is behind it is text rather than
+ * a gradient.
+ */
+@utility glass-chrome {
+  border-color: var(--hairline);
+  background-color: var(--glass-solid-bg);
+  backdrop-filter: var(--glass-blur);
+}
+
+/**
+ * A surface that opens something.
+ *
+ * The lift is 1px over 140ms - enough to answer "is this clickable", not enough
+ * to make a grid of twelve cards feel like it is breathing. The fill does not
+ * change: the border warms and the shadow deepens, which reads on a card
+ * carrying a photograph where a blue tint does not.
+ */
+@utility glass-interactive {
+  transition:
+    box-shadow 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+
+  &:hover {
+    border-color: var(--hairline-strong);
+    box-shadow: var(--edge-light), var(--shadow-lift);
+    transform: translateY(-1px);
+  }
+}
+
+/** A divider that matches the surface borders. */
+@utility hairline {
+  border-color: var(--hairline);
+}
+
+@utility hairline-inner {
+  border-color: var(--hairline-inner);
+}
+
+/*
+ * In a browser without `backdrop-filter` the translucent background would show
+ * the canvas wash straight through, unblurred, which looks like a mistake
+ * rather than like glass. There, the surfaces simply go opaque.
+ */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-panel,
+  .glass-card,
+  .glass-chrome {
+    background-color: rgb(255 255 255 / 0.97);
+  }
+}
+
+/*
+ * -----------------------------------------------------------------------------
+ * Utilities
+ * -----------------------------------------------------------------------------
+ */
+
+/** The card radius, for the few places it has to be matched by hand. */
+@utility rounded-card {
+  border-radius: var(--radius-card);
+}
+
+/** The control radius: buttons, inputs, selects, pagination links. */
+@utility rounded-control {
+  border-radius: var(--radius-control);
+}
+
+@utility rounded-inner {
+  border-radius: var(--radius-inner);
+}
+
+/**
+ * A figure.
+ *
+ * Tabular so a row of cards does not twitch as values change width, and
+ * tightened, because at 32px and up the default tracking makes a number look
+ * loose rather than deliberate. Applied to the large readouts only - it is
+ * wrong on body text.
+ */
+@utility figure-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+/**
+ * A section label - "GROUP PERFORMANCE", "IN CONTEXT".
+ *
+ * Small, spaced and quiet. It names the block without competing with the
+ * figures inside it, which is the whole hierarchy this dashboard runs on.
+ */
+@utility section-label {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-slate-500);
+}
+
+/*
+ * -----------------------------------------------------------------------------
+ * Motion
+ * -----------------------------------------------------------------------------
+ * Every transition in the application is a hover or focus response measured in
+ * a hundred-odd milliseconds. Somebody who has asked their system for less
+ * motion gets none of it, and nothing about the interface depends on any of it
+ * having run.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .glass-interactive:hover {
+    transform: none;
+  }
 }

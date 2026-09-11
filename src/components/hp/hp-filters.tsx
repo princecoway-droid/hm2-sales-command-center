@@ -53,7 +53,7 @@ export function HpFilters({ month, filters }: HpFiltersProps) {
       // the right value. That is what an effect syncing state to a prop would
       // have been for, without the extra render.
       key={filters.search}
-      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto]"
+      className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-[1fr_auto_auto]"
       onSubmit={(event) => {
         event.preventDefault();
         const value = new FormData(event.currentTarget).get("q");
@@ -83,7 +83,11 @@ export function HpFilters({ month, filters }: HpFiltersProps) {
         ]}
       />
 
-      <div className="flex items-end gap-2">
+      {/* Top-aligned, so "Search", "HM" and "Show" sit on one line across the
+          row. The button is pushed down by exactly one label - 20px of line
+          plus the 6px `space-y-1.5` every field uses - so it lines up with the
+          controls rather than with their labels. */}
+      <div className="flex items-start gap-2">
         <div className="w-40">
           <SelectField
             label="Show"
@@ -99,7 +103,7 @@ export function HpFilters({ month, filters }: HpFiltersProps) {
 
         {/* A real submit button, so the search runs on a phone where there is
             no Enter key in reach and the keyboard's "go" is the only affordance. */}
-        <Button type="submit" variant="secondary" className="mb-0.5">
+        <Button type="submit" variant="secondary" className="mt-6.5">
           Search
         </Button>
       </div>

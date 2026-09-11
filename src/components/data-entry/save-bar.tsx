@@ -38,7 +38,7 @@ export function SaveBar({
   const canSave = dirtyCount > 0 && !blocked && status !== "saving";
 
   return (
-    <div className="sticky bottom-0 z-30 -mx-6 mt-2 border-t border-slate-200 bg-white/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <div className="glass-chrome sticky bottom-0 z-30 -mx-4 mt-2 border-t px-4 py-3 sm:-mx-6 sm:px-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0 text-sm" aria-live="polite">
           {blocked ? (

@@ -25,7 +25,7 @@ export function DashboardEmptyState({
   canEnterData,
 }: EmptyStateProps) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+    <div className="rounded-card border border-dashed border-slate-900/12 bg-white/55 px-6 py-12 text-center">
       <h2 className="text-base font-semibold text-slate-900">
         Nothing entered for {monthLabel} yet
       </h2>
@@ -64,7 +64,7 @@ export function NoReportingMonthsState({
   canEnterData,
 }: NoMonthsProps) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+    <div className="rounded-card border border-dashed border-slate-900/12 bg-white/55 px-6 py-12 text-center">
       <h2 className="text-base font-semibold text-slate-900">
         Current reporting month is not configured
       </h2>

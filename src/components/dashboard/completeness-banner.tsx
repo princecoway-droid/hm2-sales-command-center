@@ -23,7 +23,7 @@ export function CompletenessBanner({ completeness }: CompletenessBannerProps) {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm shadow-sm"
+      className="glass-card flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm sm:px-5"
     >
       <span className="flex items-center gap-2 font-medium text-slate-900">
         <span

@@ -17,7 +17,7 @@ export function ShareUnavailable() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center px-6 py-16 text-center">
       <div className="w-full max-w-sm">
-        <h1 className="text-lg font-semibold tracking-tight text-slate-900">
+        <h1 className="text-xl font-semibold tracking-tight text-slate-900">
           Report unavailable
         </h1>
 

@@ -21,18 +21,15 @@ export function HmComparison({ net, recruitment }: HmComparisonProps) {
   return (
     <section
       aria-labelledby="hm-comparison"
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      className="glass-panel flex flex-col gap-4 p-4 sm:p-5"
     >
-      <h2
-        id="hm-comparison"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+      <h2 id="hm-comparison" className="section-label">
         Previous month
       </h2>
 
       <ComparisonBlock label="Net" comparison={net} unit="units" />
 
-      <div className="border-t border-slate-100 pt-3">
+      <div className="border-t hairline-inner pt-4">
         <ComparisonBlock
           label="Recruitment"
           comparison={recruitment}
@@ -63,7 +60,7 @@ function ComparisonBlock({
           <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span
               className={cn(
-                "text-2xl font-semibold tabular-nums leading-none",
+                "figure-num text-2xl font-semibold leading-none",
                 comparison.direction === "up"
                   ? "text-emerald-700"
                   : comparison.direction === "down"

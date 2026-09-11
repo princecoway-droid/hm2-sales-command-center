@@ -159,7 +159,7 @@ export function PerformanceGrid({
     <div
       ref={containerRef}
       onKeyDown={onKeyDown}
-      className="overflow-x-auto rounded-md border border-slate-200"
+      className="overflow-x-auto rounded-card border hairline bg-white/55"
     >
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">
@@ -168,11 +168,11 @@ export function PerformanceGrid({
         </caption>
 
         <thead>
-          <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr className="bg-slate-900/[0.035] text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
             <th
               scope="col"
               rowSpan={2}
-              className="sticky left-0 z-20 border-b border-slate-200 bg-slate-50 px-3 py-2 text-left font-medium"
+              className="sticky left-0 z-20 border-b hairline bg-[#eef1f6] px-3 py-2.5 text-left font-semibold"
             >
               HM
             </th>
@@ -199,7 +199,7 @@ export function PerformanceGrid({
             </th>
           </tr>
 
-          <tr className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+          <tr className="bg-slate-900/[0.035] text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
             {weeks.map((week, index) => (
               <th
                 key={week.id}
@@ -323,7 +323,7 @@ const PerformanceGridRow = memo(function PerformanceGridRow({
     weeks.length + MONTHLY_FIELDS.indexOf(field);
 
   return (
-    <tr className="odd:bg-white even:bg-slate-50/40">
+    <tr className="transition-colors odd:bg-white/45 even:bg-white/20 hover:bg-sky-500/[0.05]">
       <th
         scope="row"
         className="sticky left-0 z-10 border-b border-slate-100 bg-inherit px-3 py-1.5 text-left font-normal"

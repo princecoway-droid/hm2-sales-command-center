@@ -52,9 +52,11 @@ export function SelectField({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         className={cn(
-          "block w-full rounded-md border-0 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm",
-          "ring-1 ring-inset focus:ring-2 focus:ring-inset focus:ring-sky-600",
-          error ? "ring-red-400" : "ring-slate-300",
+          "block min-h-11 w-full rounded-control border-0 bg-white/70 px-3 py-2 text-sm text-slate-900",
+          "shadow-[var(--shadow-control)] ring-1 ring-inset",
+          "transition-[box-shadow,background-color] duration-150 ease-out",
+          "focus:bg-white focus:ring-2 focus:ring-inset focus:ring-sky-600",
+          error ? "ring-rose-400" : "ring-slate-900/12",
           className,
         )}
         {...props}
@@ -73,7 +75,7 @@ export function SelectField({
       ) : null}
 
       {error ? (
-        <p id={errorId} className="text-xs font-medium text-red-600">
+        <p id={errorId} className="text-xs font-medium text-rose-700">
           {error}
         </p>
       ) : null}

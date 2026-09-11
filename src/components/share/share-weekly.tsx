@@ -29,12 +29,12 @@ export function ShareWeekly({ weekly, monthLabel }: ShareWeeklyProps) {
   return (
     <section
       aria-labelledby="share-weekly"
-      className="rounded-lg border border-slate-200 bg-white shadow-sm"
+      className="glass-panel"
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3">
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b hairline px-4 py-3.5 sm:px-5">
         <h2
           id="share-weekly"
-          className="text-sm font-semibold text-slate-900"
+          className="section-label"
         >
           Weekly Key-In
         </h2>
@@ -53,7 +53,7 @@ export function ShareWeekly({ weekly, monthLabel }: ShareWeeklyProps) {
         </p>
       </header>
 
-      <div className="px-4 py-3">
+      <div className="px-4 py-4 sm:px-5">
         {!weekly.hasWeeks ? (
           <p className="py-4 text-center text-sm text-slate-500">
             No sales weeks are configured for {monthLabel} yet.
@@ -82,21 +82,24 @@ function WeekRow({ week }: { week: PublicWeek }) {
           <span className="truncate text-[11px] text-slate-500">
             {week.rangeLabel}
           </span>
-          <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+          <span className="figure-num shrink-0 text-sm font-semibold text-slate-900">
             {week.unitsLabel}
           </span>
         </div>
 
-        <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-900/[0.07]">
           {week.isEntered ? (
             <div
-              className={cn("h-2 rounded-full", STATUS_BAR_CLASSES[week.status])}
+              className={cn(
+                "h-2 rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]",
+                STATUS_BAR_CLASSES[week.status],
+              )}
               // A real but tiny week still has to be visible, so the floor is
               // 4%. The figure beside it carries the actual value.
               style={{ width: `${Math.max(4, week.barPct)}%` }}
             />
           ) : (
-            <div className="h-2 w-full rounded-full border border-dashed border-slate-200" />
+            <div className="h-2 w-full rounded-full border border-dashed border-slate-900/[0.09]" />
           )}
         </div>
       </div>

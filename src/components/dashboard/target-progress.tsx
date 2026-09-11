@@ -41,19 +41,19 @@ export function TargetProgress({
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between gap-3 text-xs">
-        <span className="tabular-nums text-slate-600">
+        <span className="figure-num text-slate-600">
           <span className="font-semibold text-slate-900">
             {target.netLabel}
           </span>{" "}
           / {target.targetLabel} units
         </span>
-        <span className="font-semibold tabular-nums text-slate-900">
+        <span className="figure-num font-semibold text-slate-900">
           {target.achievementLabel}
         </span>
       </div>
 
       <div
-        className={`w-full overflow-hidden rounded-full bg-slate-100 ${height}`}
+        className={`w-full overflow-hidden rounded-full bg-slate-900/[0.07] ${height}`}
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -66,7 +66,10 @@ export function TargetProgress({
         aria-label={`${subject}: net against target`}
       >
         <div
-          className={`${height} rounded-full bg-sky-600`}
+          // A single restrained blue, shaded rather than banded: the business
+          // has defined no achievement bands, and a track that turned red
+          // below 80% would put a rule nobody made onto every screen.
+          className={`${height} rounded-full bg-gradient-to-r from-sky-600 to-sky-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]`}
           style={{ width: `${target.progressPct ?? 0}%` }}
         />
       </div>

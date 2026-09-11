@@ -35,11 +35,11 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
         {rows.map((row) => (
           <li
             key={row.id}
-            className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+            className="glass-card p-4"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-semibold break-words text-slate-900">
+                <p className="text-sm font-semibold tracking-tight break-words text-slate-900">
                   {row.hpName}
                 </p>
                 <p className="mt-0.5 font-mono text-xs tabular-nums text-slate-500">
@@ -65,7 +65,7 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
               <span className="font-mono tabular-nums">{row.hmCode}</span>
             </p>
 
-            <dl className="mt-3 grid grid-cols-4 gap-2 border-t border-slate-100 pt-3">
+            <dl className="mt-3.5 grid grid-cols-4 gap-2 border-t hairline-inner pt-3.5">
               {row.weekLabels.map((value, index) => (
                 <div key={index}>
                   <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -78,12 +78,12 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
               ))}
             </dl>
 
-            <dl className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3">
+            <dl className="mt-3.5 grid grid-cols-2 gap-2 border-t hairline-inner pt-3.5">
               <div>
                 <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                   Total Key-In
                 </dt>
-                <dd className="mt-0.5 text-lg font-semibold tabular-nums leading-none text-slate-900">
+                <dd className="figure-num mt-1 text-lg font-semibold leading-none text-slate-900">
                   {row.totalKeyInLabel}
                 </dd>
               </div>
@@ -91,7 +91,7 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
                 <dt className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
                   Total Net
                 </dt>
-                <dd className="mt-0.5 text-lg font-semibold tabular-nums leading-none text-slate-900">
+                <dd className="figure-num mt-1 text-lg font-semibold leading-none text-slate-900">
                   {row.totalNetLabel}
                 </dd>
               </div>
@@ -107,7 +107,7 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
             HP performance for {monthLabel}
           </caption>
           <thead>
-            <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+            <tr className="border-b hairline text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
               <th scope="col" className="py-2 pr-4 font-medium">
                 HP Name
               </th>
@@ -140,12 +140,14 @@ export function HpTable({ rows, monthLabel }: HpTableProps) {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-900/[0.06]">
             {rows.map((row) => (
-              <tr key={row.id}>
+              // A hover tint, because ten columns is a long way for an eye to
+              // track across without something holding the line together.
+              <tr key={row.id} className="transition-colors hover:bg-slate-900/[0.025]">
                 <th
                   scope="row"
-                  className="py-2.5 pr-4 text-left font-medium text-slate-900"
+                  className="py-3 pr-4 text-left font-medium text-slate-900"
                 >
                   {row.hpName}
                 </th>

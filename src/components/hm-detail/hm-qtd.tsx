@@ -20,19 +20,16 @@ export function HmQtd({ qtd }: HmQtdProps) {
   return (
     <section
       aria-labelledby="hm-qtd"
-      className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      className="glass-panel flex flex-col gap-4 p-4 sm:p-5"
     >
-      <h2
-        id="hm-qtd"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+      <h2 id="hm-qtd" className="section-label">
         {qtd.quarterLabel} to date
       </h2>
 
       <dl className="grid grid-cols-2 gap-3">
         <div>
           <dt className="text-xs text-slate-500">QTD Net</dt>
-          <dd className="text-2xl font-semibold tabular-nums leading-tight text-slate-900">
+          <dd className="figure-num text-2xl font-semibold leading-tight text-slate-900">
             {qtd.netLabel}
             <span className="ml-1 text-xs font-normal text-slate-400">
               units
@@ -42,7 +39,7 @@ export function HmQtd({ qtd }: HmQtdProps) {
 
         <div>
           <dt className="text-xs text-slate-500">QTD Recruitment</dt>
-          <dd className="text-2xl font-semibold tabular-nums leading-tight text-slate-900">
+          <dd className="figure-num text-2xl font-semibold leading-tight text-slate-900">
             {qtd.recruitmentLabel}
           </dd>
         </div>

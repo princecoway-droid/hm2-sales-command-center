@@ -28,7 +28,15 @@ export function SidebarNav({ items }: SidebarNavProps) {
   return (
     <nav
       aria-label="Primary"
-      className="flex gap-1 overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0"
+      // A scrolling row of chips on a phone, a stacked list from `md`. The
+      // glass panel is only drawn on the desktop column: on a phone the row is
+      // one scrollable line and a panel around it would read as a second
+      // header rather than as navigation.
+      className={cn(
+        "-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1",
+        "md:mx-0 md:block md:space-y-0.5 md:overflow-visible md:px-0 md:pb-0",
+        "md:glass-panel md:p-2",
+      )}
     >
       {items.map((item) => {
         // Which paths belong to an item is decided in the route table, so an
@@ -41,11 +49,14 @@ export function SidebarNav({ items }: SidebarNavProps) {
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "shrink-0 rounded-md px-3 py-2 text-sm transition-colors md:block",
+              "flex min-h-11 shrink-0 items-center rounded-control px-3 text-sm md:block md:py-2.5",
+              "transition-[background-color,color,box-shadow] duration-150 ease-out",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600",
               isActive
-                ? "bg-sky-50 font-medium text-sky-800"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                ? // Filled rather than tinted-and-bordered: on a translucent
+                  // panel a tint alone is not enough to read as "you are here".
+                  "bg-white font-semibold text-sky-800 shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/[0.07]"
+                : "text-slate-600 hover:bg-white/60 hover:text-slate-900",
             )}
           >
             {item.label}

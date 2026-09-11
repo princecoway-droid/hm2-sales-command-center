@@ -33,22 +33,20 @@ export function KpiCard({ tile, emphasis = "secondary" }: KpiCardProps) {
 
   const body = (
     <>
-      <p className="truncate text-[11px] font-medium uppercase tracking-wider text-slate-500">
-        {tile.label}
-      </p>
+      <p className="section-label truncate">{tile.label}</p>
 
       <p
         className={cn(
-          "mt-2 font-semibold tabular-nums leading-none text-slate-900",
+          "figure-num mt-2.5 font-semibold leading-none text-slate-900",
           emphasis === "primary"
-            ? "text-3xl lg:text-4xl"
+            ? "text-[1.75rem] sm:text-3xl lg:text-4xl"
             : "text-2xl lg:text-3xl",
         )}
       >
         {tile.value}
       </p>
 
-      <p className="mt-2 text-xs leading-4 text-slate-400">
+      <p className="mt-2.5 text-xs leading-4 text-slate-400">
         {subLabel ?? " "}
       </p>
     </>
@@ -57,8 +55,7 @@ export function KpiCard({ tile, emphasis = "secondary" }: KpiCardProps) {
   // `min-w-0` matters on both branches: a grid item sizes to its content by
   // default, so without it a long figure pushes the card wider than its column
   // instead of the column deciding how much room the figure gets.
-  const shell =
-    "flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm";
+  const shell = "glass-card flex min-w-0 flex-col px-4 py-4 sm:px-5";
 
   if (!tile.href) {
     return <div className={shell}>{body}</div>;
@@ -72,7 +69,7 @@ export function KpiCard({ tile, emphasis = "secondary" }: KpiCardProps) {
       aria-label={`${tile.label}, ${tile.value} - open the HP list`}
       className={cn(
         shell,
-        "transition-colors hover:border-sky-300 hover:bg-sky-50/40",
+        "glass-interactive",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600",
       )}
     >

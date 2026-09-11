@@ -41,13 +41,10 @@ export function WeeklyKeyIn({ weekly, monthLabel }: WeeklyKeyInProps) {
   return (
     <section
       aria-labelledby="weekly-keyin"
-      className="rounded-lg border border-slate-200 bg-white shadow-sm"
+      className="glass-panel"
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3">
-        <h2
-          id="weekly-keyin"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-        >
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b hairline px-4 py-3.5 sm:px-5">
+        <h2 id="weekly-keyin" className="section-label">
           Weekly Key-In
         </h2>
 
@@ -65,7 +62,7 @@ export function WeeklyKeyIn({ weekly, monthLabel }: WeeklyKeyInProps) {
         </p>
       </header>
 
-      <div className="px-4 py-4">
+      <div className="px-4 py-5 sm:px-5">
         {!weekly.hasWeeks ? (
           <p className="py-6 text-center text-sm text-slate-500">
             No sales weeks are configured for {monthLabel}. Add the Coway
@@ -73,7 +70,7 @@ export function WeeklyKeyIn({ weekly, monthLabel }: WeeklyKeyInProps) {
           </p>
         ) : (
           <>
-            <ol className="flex items-end gap-2 sm:gap-3">
+            <ol className="flex items-end gap-2 sm:gap-3.5">
               {weekly.weeks.map((week) => (
                 <WeekColumn key={week.weekId} week={week} />
               ))}
@@ -90,7 +87,7 @@ export function WeeklyKeyIn({ weekly, monthLabel }: WeeklyKeyInProps) {
 function WeekColumn({ week }: { week: WeeklyBar }) {
   return (
     <li className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-      <span className="text-sm font-semibold tabular-nums text-slate-900">
+      <span className="figure-num text-sm font-semibold text-slate-900">
         {week.unitsLabel}
       </span>
 
@@ -101,7 +98,9 @@ function WeekColumn({ week }: { week: WeeklyBar }) {
         {week.isEntered ? (
           <div
             className={cn(
-              "w-full rounded-t-md",
+              // Rounded at the top only - the bar grows from a baseline, and a
+              // pill would float off it.
+              "w-full rounded-t-lg shadow-[inset_0_1px_0_rgb(255_255_255/0.35)]",
               STATUS_BAR_CLASSES[week.status],
             )}
             // A real but tiny week still has to be visible as a bar, so the
@@ -110,7 +109,7 @@ function WeekColumn({ week }: { week: WeeklyBar }) {
             style={{ height: `${Math.max(4, week.barPct)}%` }}
           />
         ) : (
-          <div className="h-full w-full rounded-t-md border border-dashed border-slate-200 bg-slate-50/60" />
+          <div className="h-full w-full rounded-t-lg border border-dashed border-slate-900/[0.09] bg-slate-900/[0.02]" />
         )}
       </div>
 
@@ -185,7 +184,7 @@ function Legend() {
   ];
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-3">
+    <div className="mt-5 border-t hairline-inner pt-3.5">
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <li className="font-medium text-slate-600">Weekly volume</li>
         {entries.map((entry) => (

@@ -4,11 +4,18 @@ import { cn } from "@/lib/utils";
 
 type BadgeTone = "neutral" | "accent" | "positive" | "muted";
 
+/**
+ * Tinted rather than filled, and ringed rather than bordered.
+ *
+ * A badge sits on a translucent surface, so the fill is kept light enough that
+ * the surface still reads as glass underneath it and the ring does the work of
+ * defining the shape.
+ */
 const TONES: Record<BadgeTone, string> = {
-  neutral: "bg-slate-100 text-slate-700 ring-slate-200",
-  accent: "bg-sky-50 text-sky-800 ring-sky-200",
-  positive: "bg-emerald-50 text-emerald-800 ring-emerald-200",
-  muted: "bg-slate-50 text-slate-500 ring-slate-200",
+  neutral: "bg-slate-900/[0.05] text-slate-700 ring-slate-900/10",
+  accent: "bg-sky-500/10 text-sky-800 ring-sky-600/20",
+  positive: "bg-emerald-500/10 text-emerald-800 ring-emerald-600/20",
+  muted: "bg-slate-900/[0.03] text-slate-500 ring-slate-900/[0.08]",
 };
 
 type BadgeProps = {

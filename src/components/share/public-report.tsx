@@ -51,11 +51,11 @@ type PublicReportProps = {
 
 export function PublicReport({ report, token }: PublicReportProps) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+    <div className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
       <ReportHeader report={report} />
 
       {!report.hasAnyData ? (
-        <p className="mt-6 rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+        <p className="glass-card mt-6 px-4 py-10 text-center text-sm text-slate-500">
           No figures have been recorded for {report.monthLabel} yet.
         </p>
       ) : (
@@ -85,14 +85,14 @@ export function PublicReport({ report, token }: PublicReportProps) {
  */
 function ReportHeader({ report }: { report: PublicShareViewModel }) {
   return (
-    <header className="border-b border-slate-200 pb-4">
+    <header className="border-b hairline pb-5">
       <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
         {report.title}
       </p>
 
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+      <h1 className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[1.75rem] font-semibold leading-none tracking-tight text-slate-900 sm:text-4xl">
         {report.monthLabel}
-        <span className="ml-2 align-middle text-sm font-medium text-slate-400">
+        <span className="rounded-full bg-slate-900/[0.05] px-2.5 py-1 align-middle text-xs font-medium tracking-normal text-slate-500 ring-1 ring-inset ring-slate-900/[0.06]">
           {report.quarterLabel}
         </span>
       </h1>
@@ -142,7 +142,7 @@ function GroupPerformance({ report }: { report: PublicShareViewModel }) {
 
   return (
     <section aria-labelledby="share-group" className="space-y-3">
-      <h2 id="share-group" className="text-sm font-semibold text-slate-900">
+      <h2 id="share-group" className="section-label">
         Group performance
       </h2>
 
@@ -158,27 +158,27 @@ function GroupPerformance({ report }: { report: PublicShareViewModel }) {
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
+      <div className="glass-panel px-4 py-4 sm:px-5">
+        <p className="section-label mb-2.5">
           Net against target
         </p>
 
         {report.target.hasTarget ? (
           <div className="space-y-1.5">
             <div className="flex items-baseline justify-between gap-3 text-xs">
-              <span className="tabular-nums text-slate-600">
+              <span className="figure-num text-slate-600">
                 <span className="font-semibold text-slate-900">
                   {report.target.netLabel}
                 </span>{" "}
                 / {report.target.targetLabel} units
               </span>
-              <span className="font-semibold tabular-nums text-slate-900">
+              <span className="figure-num font-semibold text-slate-900">
                 {report.target.achievementLabel}
               </span>
             </div>
 
             <div
-              className="h-2 w-full overflow-hidden rounded-full bg-slate-100"
+              className="h-2 w-full overflow-hidden rounded-full bg-slate-900/[0.07]"
               role="progressbar"
               aria-valuemin={0}
               aria-valuemax={100}
@@ -191,7 +191,7 @@ function GroupPerformance({ report }: { report: PublicShareViewModel }) {
               aria-label={`Group net against target, ${report.monthLabel}`}
             >
               <div
-                className="h-2 rounded-full bg-sky-600"
+                className="h-2 rounded-full bg-gradient-to-r from-sky-600 to-sky-500 shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]"
                 style={{ width: `${report.target.progressPct ?? 0}%` }}
               />
             </div>
@@ -208,8 +208,8 @@ function ShareKpi({ tile, emphasis }: { tile: PublicKpi; emphasis?: boolean }) {
   const subLabel = tile.unit ?? tile.note;
 
   return (
-    <div className="flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm sm:px-4">
-      <p className="truncate text-[11px] font-medium uppercase tracking-wider text-slate-500">
+    <div className="glass-card flex min-w-0 flex-col px-3.5 py-3.5 sm:px-4">
+      <p className="section-label truncate">
         {tile.label}
       </p>
 
@@ -224,7 +224,7 @@ function ShareKpi({ tile, emphasis }: { tile: PublicKpi; emphasis?: boolean }) {
 
       {/* Always rendered, blank when there is nothing to say, so a row of
           cards stays the same height whatever has been entered. */}
-      <p className="mt-1.5 text-[11px] leading-4 text-slate-400">
+      <p className="mt-2 text-[11px] leading-4 text-slate-400">
         {subLabel ?? " "}
       </p>
     </div>
@@ -254,14 +254,14 @@ function HmPerformance({
   return (
     <section aria-labelledby="share-hms" className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="share-hms" className="text-sm font-semibold text-slate-900">
+        <h2 id="share-hms" className="section-label">
           HM performance
         </h2>
         <p className="text-xs text-slate-500">Ranked by net units</p>
       </div>
 
       {report.hms.length === 0 ? (
-        <p className="rounded-lg border border-slate-200 bg-white px-4 py-6 text-center text-sm text-slate-500">
+        <p className="glass-card px-4 py-8 text-center text-sm text-slate-500">
           No HM records for {report.monthLabel}.
         </p>
       ) : (
@@ -290,7 +290,7 @@ function HmPerformance({
  */
 function ReportFooter({ updatedLabel }: { updatedLabel: string | null }) {
   return (
-    <footer className="mt-8 border-t border-slate-200 pt-4 text-center">
+    <footer className="mt-10 border-t hairline pt-5 text-center">
       <p className="text-xs font-medium text-slate-500">{APP_NAME}</p>
       <p className="mt-0.5 text-[11px] text-slate-400">Read-only report</p>
       {updatedLabel ? (

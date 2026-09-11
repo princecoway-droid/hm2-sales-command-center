@@ -51,13 +51,10 @@ export function HmWeeklyPerformance({
   return (
     <section
       aria-labelledby="hm-weekly"
-      className="rounded-lg border border-slate-200 bg-white shadow-sm"
+      className="glass-panel"
     >
-      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3">
-        <h2
-          id="hm-weekly"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-        >
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b hairline px-4 py-3.5 sm:px-5">
+        <h2 id="hm-weekly" className="section-label">
           Weekly Key-In
         </h2>
 
@@ -70,7 +67,7 @@ export function HmWeeklyPerformance({
         </p>
       </header>
 
-      <div className="px-4 py-4">
+      <div className="px-4 py-5 sm:px-5">
         {!weekly.hasWeeks ? (
           <p className="py-6 text-center text-sm text-slate-500">
             No sales weeks are configured for {monthLabel}. Add the Coway
@@ -106,22 +103,25 @@ function WeekRow({ week }: { week: HmWeeklyBarModel }) {
       </span>
 
       <div className="col-start-2 row-start-1 flex h-6 items-center sm:col-start-3">
-        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-900/[0.07]">
           {week.isEntered ? (
             <div
-              className={cn("h-full rounded-full", STATUS_BAR_CLASSES[week.status])}
+              className={cn(
+                "h-full rounded-full shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]",
+                STATUS_BAR_CLASSES[week.status],
+              )}
               // A real but tiny week still has to be visible as a bar, so the
               // floor is 4% rather than 0 - the figure beside it carries the
               // actual value.
               style={{ width: `${Math.max(4, week.barPct)}%` }}
             />
           ) : (
-            <div className="h-full w-full rounded-full border border-dashed border-slate-200 bg-slate-50" />
+            <div className="h-full w-full rounded-full border border-dashed border-slate-900/[0.09]" />
           )}
         </div>
       </div>
 
-      <span className="col-start-3 row-start-1 flex items-center justify-end gap-1.5 text-sm font-semibold tabular-nums text-slate-900 sm:col-start-4">
+      <span className="figure-num col-start-3 row-start-1 flex items-center justify-end gap-1.5 text-sm font-semibold text-slate-900 sm:col-start-4">
         <span
           aria-hidden
           className={cn("size-2 shrink-0 rounded-full", STATUS_DOT_CLASSES[week.status])}
@@ -180,7 +180,7 @@ function Legend() {
   ];
 
   return (
-    <div className="mt-4 border-t border-slate-100 pt-3">
+    <div className="mt-5 border-t hairline-inner pt-3.5">
       <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <li className="font-medium text-slate-600">Weekly volume</li>
         {entries.map((entry) => (

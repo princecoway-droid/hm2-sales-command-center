@@ -21,15 +21,12 @@ type HmSecondaryKpisProps = {
  */
 export function HmSecondaryKpis({ metrics }: HmSecondaryKpisProps) {
   return (
-    <section aria-labelledby="hm-secondary" className="space-y-3">
-      <h2
-        id="hm-secondary"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+    <section aria-labelledby="hm-secondary" className="space-y-3 sm:space-y-4">
+      <h2 id="hm-secondary" className="section-label">
         Recruitment, Active HP and SHI
       </h2>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         {metrics.map((metric) => (
           <HmMetric key={metric.key} metric={metric} />
         ))}

@@ -174,7 +174,7 @@ export function HpImportWorkspace({
                     setDismissedPreview(true);
                     setCommitState(initialHpImportCommitState);
                   }}
-                  className="block w-full rounded-md text-sm text-slate-700 ring-1 ring-inset ring-slate-300 file:mr-3 file:min-h-11 file:rounded-l-md file:border-0 file:bg-slate-100 file:px-3 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-600"
+                  className="block w-full cursor-pointer rounded-control bg-white/70 text-sm text-slate-700 shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/12 file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-l-control file:border-0 file:bg-slate-900/[0.05] file:px-4 file:text-sm file:font-medium file:text-slate-700 hover:file:bg-slate-900/[0.08] focus:ring-2 focus:ring-inset focus:ring-sky-600"
                 />
                 <p className="text-xs text-slate-500">
                   .xlsx only, up to {MAX_XLSX_MB} MB. Columns: HM CODE, HP
@@ -279,11 +279,9 @@ function ValidateButton() {
 
 function ResultFigure({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-        {label}
-      </dt>
-      <dd className="mt-1 text-2xl font-semibold tabular-nums leading-none text-slate-900">
+    <div className="glass-card px-3.5 py-3">
+      <dt className="section-label truncate">{label}</dt>
+      <dd className="figure-num mt-1.5 text-2xl font-semibold leading-none text-slate-900">
         {value}
       </dd>
     </div>
@@ -388,7 +386,7 @@ function HpImportPreviewPanel({
                 Every row of the uploaded file, with the HM it mapped to
               </caption>
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+                <tr className="border-b hairline text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
                   <th scope="col" className="py-2 pr-3 font-medium">
                     Row
                   </th>

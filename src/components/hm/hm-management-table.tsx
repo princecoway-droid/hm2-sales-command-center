@@ -98,7 +98,7 @@ export function HmManagementTable({ hms, canDelete }: HmManagementTableProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
+              <tr className="border-b hairline text-[11px] font-semibold uppercase tracking-[0.07em] text-slate-500">
                 <th scope="col" className="py-2 pr-4 font-medium">
                   HM
                 </th>
@@ -119,7 +119,7 @@ export function HmManagementTable({ hms, canDelete }: HmManagementTableProps) {
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-900/[0.06]">
               {hms.map((hm) => {
                 const busy = pendingId === hm.id;
 

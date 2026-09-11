@@ -20,12 +20,9 @@ type HmPerformanceProps = {
  */
 export function HmPerformance({ hms, monthLabel }: HmPerformanceProps) {
   return (
-    <section aria-labelledby="hm-performance" className="space-y-3">
+    <section aria-labelledby="hm-performance" className="space-y-3 sm:space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2
-          id="hm-performance"
-          className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-        >
+        <h2 id="hm-performance" className="section-label">
           HM performance
         </h2>
         <p className="text-xs text-slate-400">
@@ -34,11 +31,11 @@ export function HmPerformance({ hms, monthLabel }: HmPerformanceProps) {
       </div>
 
       {hms.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-8 text-center text-sm text-slate-500">
+        <p className="rounded-card border border-dashed border-slate-900/12 bg-white/50 px-4 py-10 text-center text-sm text-slate-500">
           No HMs are covered by {monthLabel}.
         </p>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
           {hms.map((hm) => (
             <li key={hm.hmId}>
               <HmCard hm={hm} />

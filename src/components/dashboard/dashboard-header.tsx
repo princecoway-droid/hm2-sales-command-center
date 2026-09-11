@@ -30,20 +30,23 @@ export function DashboardHeader({
   controls,
 }: DashboardHeaderProps) {
   return (
-    <header className="flex flex-col gap-4 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
+    <header className="flex flex-col gap-4 border-b hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
           HM2 Sales Command Center
         </p>
 
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">
+        {/* The month is the title. The quarter rides beside it as a quiet chip
+            rather than as more heading, so the two are one line without being
+            one weight. */}
+        <h1 className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[1.75rem] font-semibold leading-none tracking-tight text-slate-900 sm:text-4xl">
           {monthLabel}
-          <span className="ml-2 align-middle text-sm font-medium text-slate-400">
+          <span className="rounded-full bg-slate-900/[0.05] px-2.5 py-1 align-middle text-xs font-medium tracking-normal text-slate-500 ring-1 ring-inset ring-slate-900/[0.06]">
             {quarterLabel}
           </span>
         </h1>
 
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-slate-500">
           {updatedLabel ? (
             <>Updated {updatedLabel} (MYT)</>
           ) : (

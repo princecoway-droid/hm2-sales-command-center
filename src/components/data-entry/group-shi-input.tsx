@@ -50,7 +50,7 @@ export function GroupShiInput({ value, onChange, error }: GroupShiInputProps) {
       </div>
 
       {error ? (
-        <p id="group-shi-error" className="text-xs font-medium text-red-600">
+        <p id="group-shi-error" className="text-xs font-medium text-rose-700">
           {error}
         </p>
       ) : (

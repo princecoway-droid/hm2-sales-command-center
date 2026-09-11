@@ -65,7 +65,11 @@ export function MonthSwitcher({
         isPending && "opacity-70",
       )}
     >
-      <div className="flex items-center rounded-md ring-1 ring-inset ring-slate-300">
+      {/* One segmented control - arrow, month, arrow - rather than three
+          separate chips. The hairline belongs to the group, and the dividers
+          inside it are the same hairline, so it reads as a single object the
+          way a native segmented control does. */}
+      <div className="glass-chrome flex items-center overflow-hidden rounded-control shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/10">
         <StepLink month={previous} direction="previous" basePath={basePath} />
 
         <label htmlFor="dashboard-month" className="sr-only">
@@ -89,7 +93,7 @@ export function MonthSwitcher({
             // the only way to change month on a phone, and at the 36px it used
             // to be, the two arrows either side of it were a 32px-wide miss
             // waiting to happen.
-            "min-h-11 border-x border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900",
+            "min-h-11 border-x hairline bg-transparent px-3 py-2 text-sm font-medium text-slate-900",
             "focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-sky-600",
           )}
         >
@@ -107,7 +111,7 @@ export function MonthSwitcher({
         <Link
           href={`${basePath}?month=${monthParam(current)}`}
           className={cn(
-            "inline-flex min-h-11 items-center rounded-md px-2.5 py-2 text-sm font-medium text-sky-700 hover:bg-sky-50",
+            "inline-flex min-h-11 items-center rounded-control px-3 py-2 text-sm font-medium text-sky-700 transition-colors hover:bg-sky-600/10",
             "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600",
           )}
         >
@@ -153,7 +157,10 @@ function StepLink({
     <Link
       href={`${basePath}?month=${monthParam(month)}`}
       title={monthLabel(month)}
-      className={cn(shared, "text-slate-600 hover:bg-slate-50 hover:text-slate-900")}
+      className={cn(
+        shared,
+        "text-slate-600 hover:bg-slate-900/[0.04] hover:text-slate-900",
+      )}
     >
       <span aria-hidden>{arrow}</span>
       <span className="sr-only">

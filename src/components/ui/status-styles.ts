@@ -14,10 +14,10 @@ import type { PerformanceStatus } from "@/lib/calculations/performance";
  * nothing is coloured.
  */
 export const STATUS_CELL_CLASSES: Record<PerformanceStatus, string> = {
-  green: "bg-emerald-50/70 text-emerald-900",
-  yellow: "bg-amber-50/80 text-amber-900",
-  red: "bg-rose-50/70 text-rose-900",
-  neutral: "bg-white text-slate-900",
+  green: "bg-emerald-500/[0.09] text-emerald-900",
+  yellow: "bg-amber-400/[0.14] text-amber-900",
+  red: "bg-rose-500/[0.09] text-rose-900",
+  neutral: "text-slate-900",
 };
 
 /** Small dot for legends and compact readouts. */
@@ -35,11 +35,15 @@ export const STATUS_DOT_CLASSES: Record<PerformanceStatus, string> = {
  * number sitting on top of it doing the work - and weaker than the pure hues
  * so five bars in a row still look like one chart. `neutral` is a blank week:
  * an outline, not a fill, because there is nothing to show the size of.
+ *
+ * A one-stop gradient, lighter at the top, so a tall bar has some form to it
+ * rather than reading as a flat block of colour. It is the same hue throughout
+ * - the gradient is shading, not a second signal.
  */
 export const STATUS_BAR_CLASSES: Record<PerformanceStatus, string> = {
-  green: "bg-emerald-500",
-  yellow: "bg-amber-400",
-  red: "bg-rose-400",
+  green: "bg-gradient-to-t from-emerald-500 to-emerald-400",
+  yellow: "bg-gradient-to-t from-amber-500 to-amber-400",
+  red: "bg-gradient-to-t from-rose-500 to-rose-400",
   neutral: "bg-slate-200",
 };
 
@@ -88,14 +92,14 @@ export const KPI_STATUS_TEXT_CLASSES: Record<KpiStatus, string> = {
 
 /** Tinted pill, for the places a band has to be findable rather than merely legible. */
 export const KPI_STATUS_PILL_CLASSES: Record<KpiStatus, string> = {
-  needs_attention: "bg-rose-50 text-rose-800 ring-rose-200",
-  watch: "bg-amber-50 text-amber-800 ring-amber-200",
-  on_track: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+  needs_attention: "bg-rose-500/[0.09] text-rose-800 ring-rose-600/20",
+  watch: "bg-amber-400/[0.14] text-amber-900 ring-amber-600/25",
+  on_track: "bg-emerald-500/[0.09] text-emerald-800 ring-emerald-600/20",
 };
 
 /** The "no band" appearance. Not a fourth band - nothing has been stated. */
 export const KPI_STATUS_NONE_CLASSES = {
   dot: "bg-slate-300",
   text: "text-slate-400",
-  pill: "bg-slate-50 text-slate-500 ring-slate-200",
+  pill: "bg-slate-900/[0.04] text-slate-500 ring-slate-900/10",
 } as const;

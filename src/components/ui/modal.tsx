@@ -66,13 +66,18 @@ export function Modal({
         }
       }}
       className={cn(
-        "m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-0 shadow-xl",
-        "backdrop:bg-slate-900/40",
+        "glass-panel m-auto w-[min(32rem,calc(100vw-2rem))] p-0",
+        // A blurred scrim rather than a flat wash: the page behind stays
+        // recognisable as the place the dialog was opened from.
+        "backdrop:bg-slate-900/25 backdrop:backdrop-blur-[3px]",
         className,
       )}
     >
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h2 id="modal-title" className="text-sm font-semibold text-slate-900">
+      <div className="border-b hairline px-5 py-4">
+        <h2
+          id="modal-title"
+          className="text-sm font-semibold tracking-tight text-slate-900"
+        >
           {title}
         </h2>
         {description ? (

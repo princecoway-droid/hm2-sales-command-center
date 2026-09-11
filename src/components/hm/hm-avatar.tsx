@@ -43,7 +43,12 @@ export function HmAvatar({
       <img
         src={photoUrl}
         alt=""
-        className={cn(shared, "bg-slate-100 ring-1 ring-slate-200")}
+        // A hairline ring and a soft shadow rather than a hard border: a
+        // photograph sitting on glass needs an edge, not a frame.
+        className={cn(
+          shared,
+          "bg-slate-900/[0.04] shadow-[var(--shadow-control)] ring-1 ring-slate-900/10",
+        )}
         loading="lazy"
         decoding="async"
       />
@@ -55,7 +60,7 @@ export function HmAvatar({
       aria-hidden
       className={cn(
         shared,
-        "flex items-center justify-center bg-slate-100 font-semibold text-slate-500 ring-1 ring-slate-200",
+        "flex items-center justify-center bg-slate-900/[0.05] font-semibold text-slate-500 shadow-[var(--shadow-control)] ring-1 ring-slate-900/10",
       )}
     >
       {initials(name)}

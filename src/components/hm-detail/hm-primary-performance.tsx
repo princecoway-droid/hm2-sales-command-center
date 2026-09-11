@@ -21,15 +21,12 @@ type HmPrimaryPerformanceProps = {
  */
 export function HmPrimaryPerformance({ detail }: HmPrimaryPerformanceProps) {
   return (
-    <section aria-labelledby="hm-primary" className="space-y-3">
-      <h2
-        id="hm-primary"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+    <section aria-labelledby="hm-primary" className="space-y-3 sm:space-y-4">
+      <h2 id="hm-primary" className="section-label">
         This month
       </h2>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
         {/* Net gets the full width on a phone. Squeezed into a third of a
             375px row it is no larger than the figures supporting it, which
             loses the one piece of hierarchy this screen has. */}
@@ -41,17 +38,15 @@ export function HmPrimaryPerformance({ detail }: HmPrimaryPerformanceProps) {
         <HmMetric metric={detail.achievement} emphasis="lead" />
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-          Net against target
-        </p>
+      <div className="glass-panel px-4 py-4 sm:px-5">
+        <p className="section-label mb-2.5">Net against target</p>
         <TargetProgress
           target={detail.targetProgress}
           subject={`${detail.hm.name}, ${detail.month.label}`}
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         <HmMetric metric={detail.keyIn} />
         <HmMetric metric={detail.netRatio} />
       </div>

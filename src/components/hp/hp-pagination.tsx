@@ -20,14 +20,14 @@ type HpPaginationProps = {
  */
 export function HpPagination({ pagination }: HpPaginationProps) {
   const linkClasses =
-    "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-sky-700 ring-1 ring-inset ring-slate-300 hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600";
+    "glass-chrome inline-flex min-h-11 items-center rounded-control px-3.5 text-sm font-medium text-sky-700 shadow-[var(--shadow-control)] ring-1 ring-inset ring-slate-900/10 transition-colors hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-600";
   const disabledClasses =
-    "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-slate-300 ring-1 ring-inset ring-slate-200";
+    "inline-flex min-h-11 items-center rounded-control px-3.5 text-sm font-medium text-slate-300 ring-1 ring-inset ring-slate-900/[0.06]";
 
   return (
     <nav
       aria-label="HP list pages"
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3"
+      className="flex flex-wrap items-center justify-between gap-3 border-t hairline pt-4"
     >
       <p className="text-xs text-slate-500">{pagination.rangeLabel}</p>
 

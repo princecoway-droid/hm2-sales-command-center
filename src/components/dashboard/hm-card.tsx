@@ -39,7 +39,7 @@ export function HmCard({ hm }: HmCardProps) {
   return (
     <article
       aria-label={`${hm.name}, ${hm.office}`}
-      className="group relative flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-sky-300 hover:bg-sky-50/30 focus-within:border-sky-400 focus-within:ring-2 focus-within:ring-sky-200"
+      className="group glass-card glass-interactive relative flex h-full flex-col p-4 focus-within:ring-2 focus-within:ring-sky-500/35 sm:p-5"
     >
       <header className="flex items-start gap-3">
         {/* The existing avatar, so a missing photo falls back to initials at
@@ -53,14 +53,14 @@ export function HmCard({ hm }: HmCardProps) {
             {/* Wraps rather than truncates. A card is an HM's identity, and
                 "Sample HM…" with the distinguishing part cut off is worse than
                 a name on two lines. */}
-            <h3 className="text-sm font-semibold break-words text-slate-900">
+            <h3 className="text-[0.9375rem] font-semibold leading-snug tracking-tight break-words text-slate-900">
               {/* `after:absolute inset-0` turns the card into the hit area
                   without nesting the figures inside the anchor. Anything else
                   in the card that has to stay clickable - the Active HP figure
                   below - lifts itself above this overlay with `relative z-10`. */}
               <Link
                 href={hm.href}
-                className="outline-none after:absolute after:inset-0 after:rounded-lg group-hover:text-sky-900"
+                className="outline-none after:absolute after:inset-0 after:rounded-card group-hover:text-sky-900"
               >
                 {hm.name}
                 <span className="sr-only">
@@ -88,7 +88,7 @@ export function HmCard({ hm }: HmCardProps) {
         </div>
 
         <span
-          className="shrink-0 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600"
+          className="shrink-0 rounded-full bg-slate-900/[0.05] px-2 py-0.5 text-xs font-medium tabular-nums text-slate-600 ring-1 ring-inset ring-slate-900/[0.06]"
           title="Rank by net units"
         >
           #{hm.rank}
@@ -100,7 +100,7 @@ export function HmCard({ hm }: HmCardProps) {
           recruitment red" is something a manager can act on this afternoon,
           where a single combined score for the card would say only that
           something, somewhere, is off. */}
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+      <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-4">
         <Figure
           label="Net"
           value={hm.netLabel}
@@ -133,7 +133,7 @@ export function HmCard({ hm }: HmCardProps) {
         />
       </dl>
 
-      <div className="mt-4 border-t border-slate-100 pt-3">
+      <div className="mt-5 border-t hairline-inner pt-3.5">
         <TargetProgress target={targetOf(hm)} subject={hm.name} size="sm" />
       </div>
 
@@ -186,12 +186,10 @@ function Figure({
 }: FigureProps) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium uppercase tracking-wider text-slate-500">
-        {label}
-      </dt>
+      <dt className="section-label truncate">{label}</dt>
       <dd
         className={cn(
-          "mt-0.5 font-semibold tabular-nums text-slate-900",
+          "figure-num mt-1 font-semibold text-slate-900",
           emphasis ? "text-2xl leading-none" : "text-lg leading-none",
         )}
       >

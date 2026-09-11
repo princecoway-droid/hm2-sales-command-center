@@ -29,30 +29,25 @@ export function GroupKpis({ kpis, target, monthLabel }: GroupKpisProps) {
   const secondary = kpis.slice(4);
 
   return (
-    <section aria-labelledby="group-performance" className="space-y-3">
-      <h2
-        id="group-performance"
-        className="text-xs font-semibold uppercase tracking-wider text-slate-500"
-      >
+    <section aria-labelledby="group-performance" className="space-y-3 sm:space-y-4">
+      <h2 id="group-performance" className="section-label">
         Group performance
       </h2>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {primary.map((tile) => (
           <KpiCard key={tile.key} tile={tile} emphasis="primary" />
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {secondary.map((tile) => (
           <KpiCard key={tile.key} tile={tile} />
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3.5 shadow-sm">
-        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-slate-500">
-          Net against target
-        </p>
+      <div className="glass-panel px-4 py-4 sm:px-5">
+        <p className="section-label mb-2.5">Net against target</p>
         <TargetProgress target={target} subject={`Group, ${monthLabel}`} />
       </div>
     </section>
