@@ -167,6 +167,24 @@ export function shareHmPath(token: string, hmId: string): string {
 }
 
 /**
+ * `/share/<token>/hm/<hmId>/hp`.
+ *
+ * One HM's HP list, read-only, under the token that already authorizes the
+ * screen it is opened from. Nested one level deeper than the HM view for the
+ * same reason that one is nested under the report: the token stays in the path,
+ * so the page is reached by holding a live link and by nothing else, and
+ * revoking that link closes all three in the same instant.
+ *
+ * No `?month=` and no filters. The month is the token's, and a public page that
+ * read search parameters would be a database browser with a nicer header - so
+ * this one shows the HM's whole month, active HPs first, and offers nothing to
+ * change.
+ */
+export function shareHmHpPath(token: string, hmId: string): string {
+  return `${shareHmPath(token, hmId)}/hp`;
+}
+
+/**
  * `/hp?month=2026-09&hm=<id>&active=1`.
  *
  * Built in one place because it is a LINK TARGET as much as a route: the

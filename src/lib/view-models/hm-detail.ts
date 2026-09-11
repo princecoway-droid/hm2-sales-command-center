@@ -396,14 +396,21 @@ export type HmDetailPresenterInput = {
    * that view must not carry - today, the HM Code. Deciding it here rather than
    * in the components means a public page cannot start showing one because
    * somebody added a field to a card.
+   *
+   * It deliberately does NOT decide where Active HP links: both audiences have
+   * an HP list now, at different addresses, and only the caller knows which of
+   * them it holds a path to.
    */
   audience?: "private" | "public";
   /**
-   * Where the Active HP figure links, on the signed-in screen.
+   * Where the Active HP figure opens.
    *
-   * Passed in rather than built here so the presenter stays free of route
-   * construction, and so the public view - whose viewer cannot open `/hp` -
-   * simply has none.
+   * `/hp?month=…&hm=…` on the signed-in screen; `/share/<token>/hm/<id>/hp`
+   * behind a share token. Passed in rather than built here so the presenter
+   * stays free of route construction - and so a public model cannot be handed a
+   * path into the private app even by mistake, because the caller that can
+   * build one has no token and the caller that has a token builds the public
+   * one.
    */
   hpListingHref?: string | null;
 };
@@ -515,10 +522,7 @@ export function buildHmDetailViewModel({
       hasTarget,
     },
 
-    secondary: buildSecondary(
-      hm,
-      audience === "public" ? null : hpListingHref,
-    ),
+    secondary: buildSecondary(hm, hpListingHref),
     weekly: buildWeekly(hm),
     salesMix: buildSalesMix(hm),
     previousMonthNet: buildMonthOverMonthModel(model.previousMonthNet),

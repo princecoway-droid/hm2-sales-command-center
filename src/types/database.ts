@@ -591,6 +591,18 @@ export type Database = {
         Returns: Json;
       };
       /**
+       * The third and last function `anon` may execute.
+       *
+       * The same token and the same gate as `resolve_share_hm_report`, narrowed
+       * to ONE HM's HP rows for the token's own month: HP code, name and the
+       * month's figures. No row id, no hm_id, no audit column, capped at 1000
+       * rows. Narrowed in `lib/share/resolve-hp.ts`.
+       */
+      resolve_share_hm_hp: {
+        Args: { p_token: string; p_hm_id: string };
+        Returns: Json;
+      };
+      /**
        * The whole HP import, in one transaction.
        *
        * NOT `security definer`: every statement inside runs as the caller under

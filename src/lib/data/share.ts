@@ -9,6 +9,11 @@ import {
   parseShareHmPayload,
 } from "@/lib/share/resolve-hm";
 import {
+  buildShareHpList,
+  parseShareHpPayload,
+  type ShareHpListViewModel,
+} from "@/lib/share/resolve-hp";
+import {
   generateShareToken,
   isShareTokenShaped,
   shareLinkExpiry,
@@ -351,7 +356,10 @@ const HM_ID = uuid("HM");
 export async function getPublicShareHmReport(
   token: string,
   hmId: string,
-  { backHref }: { backHref: string },
+  {
+    backHref,
+    hpListingHref,
+  }: { backHref: string; hpListingHref: string | null },
 ): Promise<Result<HmDetailViewModel | null>> {
   if (!isShareTokenShaped(token) || !HM_ID.safeParse(hmId).success) {
     return ok(null);
@@ -378,7 +386,7 @@ export async function getPublicShareHmReport(
     return ok(null);
   }
 
-  const detail = buildShareHmDetail(payload, { backHref });
+  const detail = buildShareHmDetail(payload, { backHref, hpListingHref });
 
   if (!detail) {
     console.error("[share] the HM month could not be assembled");
@@ -387,4 +395,53 @@ export async function getPublicShareHmReport(
   }
 
   return ok(detail);
+}
+
+/**
+ * One HM's HP list, for a public viewer holding a live token.
+ *
+ * The third and last public read, and the same five steps as the one above with
+ * one function swapped: `resolve_share_hm_hp` applies the identical token and
+ * HM gates, then returns that HM's HP rows for the token's own month.
+ *
+ * It is the only path on which an HP row leaves the database anonymously. What
+ * makes that safe is not this function - it is the projection in SQL, which
+ * carries no row id, no `hm_id` and no audit column, and cannot be asked about
+ * a different HM or a different month. Nothing here filters; there is nothing
+ * left to filter.
+ *
+ * `null` for every unusable request, undistinguishable from the outside, for
+ * the same reason as everywhere else on this path.
+ */
+export async function getPublicShareHmHpList(
+  token: string,
+  hmId: string,
+  { backHref }: { backHref: string },
+): Promise<Result<ShareHpListViewModel | null>> {
+  if (!isShareTokenShaped(token) || !HM_ID.safeParse(hmId).success) {
+    return ok(null);
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase.rpc("resolve_share_hm_hp", {
+    p_token: token,
+    p_hm_id: hmId,
+  });
+
+  if (error) {
+    // Logged server-side, never surfaced - a database error must not become a
+    // probing oracle here any more than it may on the other two pages.
+    console.error("[share] hp resolve failed:", error.message);
+
+    return err("This report is unavailable.");
+  }
+
+  const payload = parseShareHpPayload(data);
+
+  if (!payload) {
+    return ok(null);
+  }
+
+  return ok(buildShareHpList(payload, { backHref }));
 }

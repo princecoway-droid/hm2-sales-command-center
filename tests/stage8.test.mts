@@ -68,10 +68,15 @@ import {
   hpListingPath,
   isPublicRoute,
   navItemsForRole,
+  shareHmHpPath,
+  shareHmPath,
+  sharePath,
   PUBLIC_ROUTES,
   ROUTES,
 } from "@/lib/routes";
 import { hpImportCommitSchema, parseHpImportResult } from "@/lib/validation/hp";
+import { buildShareHmDetail, parseShareHmPayload } from "@/lib/share/resolve-hm";
+import { buildShareHpList, parseShareHpPayload } from "@/lib/share/resolve-hp";
 import { buildDashboardViewModel } from "@/lib/view-models/dashboard";
 import { buildHmDetailViewModel } from "@/lib/view-models/hm-detail";
 import { buildHpListingViewModel } from "@/lib/view-models/hp-listing";
@@ -179,6 +184,9 @@ check(
 // =============================================================================
 section("[S8-B] reading a real .xlsx");
 // =============================================================================
+
+/** A token-shaped string for the link assertions. Never a real one. */
+const PUBLIC_TOKEN = "s8ShareTokenForLinkAssertionsOnly_0123456789";
 
 const HEADER = [
   "HM CODE",
@@ -861,13 +869,20 @@ section("[S8-G] the dashboard, the HM screen and the links between them");
   );
 
   // ---- the same model, for a public viewer ---------------------------------
+  //
+  // A share-token reader now HAS an HP list - their own, under the token - so
+  // the public model carries a link too. What must never happen is that link
+  // being the private one, and that is a property of who builds it: the caller
+  // holding a token builds a `/share/...` path, and nothing that lacks one can
+  // hand this presenter a `/hp` path for a public audience.
+  const publicHpHref = shareHmHpPath(PUBLIC_TOKEN, alpha.hmId);
+
   const publicDetail = buildHmDetailViewModel({
     selectedMonth: september.month,
     model: hmModel,
     lastUpdatedAt: null,
     audience: "public",
-    // Even when a caller supplies one, a public audience must not carry it.
-    hpListingHref: hpListingPath({ month: "2026-09", activeOnly: true }),
+    hpListingHref: publicHpHref,
   });
 
   check(
@@ -875,16 +890,37 @@ section("[S8-G] the dashboard, the HM screen and the links between them");
     publicDetail.hm.hmCode === null,
   );
 
+  const publicActiveHp = publicDetail.secondary.find(
+    (metric) => metric.key === "activeHp",
+  )!;
+
   check(
-    "and no link into the private HP list",
-    publicDetail.secondary.find((metric) => metric.key === "activeHp")!.href ===
-      null,
+    "their Active HP links to the HP list UNDER THE TOKEN",
+    publicActiveHp.href === publicHpHref &&
+      publicActiveHp.href!.startsWith(`${ROUTES.share}/`),
+    publicActiveHp.href ?? "no href",
+  );
+
+  check(
+    "and never into the private app",
+    !publicActiveHp.href!.startsWith(ROUTES.hpListing) &&
+      !publicActiveHp.href!.includes("?"),
+    publicActiveHp.href ?? "",
   );
 
   check(
     "while the FIGURE is still the same on both",
-    publicDetail.secondary.find((metric) => metric.key === "activeHp")!.value ===
-      detailActiveHp.value,
+    publicActiveHp.value === detailActiveHp.value,
+  );
+
+  check(
+    "a public model with no token to build a path from is simply unlinked",
+    buildHmDetailViewModel({
+      selectedMonth: september.month,
+      model: hmModel,
+      lastUpdatedAt: null,
+      audience: "public",
+    }).secondary.find((metric) => metric.key === "activeHp")!.href == null,
   );
 }
 
@@ -1561,6 +1597,221 @@ section("[S8-K] the import, against a real Postgres");
     derived.active_hp !== 999,
     String(derived.active_hp),
   );
+
+  // ---- the HP list behind a share token -------------------------------------
+  //
+  // The third public function, across the same seam and against the same real
+  // Postgres. What is being proved is what a fixture cannot: that the jsonb
+  // `resolve_share_hm_hp` builds feeds the page model, that the figures on it
+  // are the ones the HM view they came from showed, and that the projection
+  // carries nothing a token holder should not have.
+  {
+    const shareToken = "shareTokenForTheHpListTest_0123456789abcd";
+
+    await db.exec(
+      `insert into public.share_links (token, month_id)
+         values ('${shareToken}', '${september.id}')`,
+    );
+
+    const resolveHp = async (tokenValue: string, id: string) => {
+      await db.exec(`set role anon`);
+      const body = (
+        (await db.query(
+          `select public.resolve_share_hm_hp('${tokenValue}', '${id}') as body`,
+        )) as { rows: { body: unknown }[] }
+      ).rows[0]!.body;
+      await asSuperuser();
+
+      return body;
+    };
+
+    const raw = await resolveHp(shareToken, alpha.id);
+
+    check("anon resolves an HM's HP list under a live token", raw !== null);
+
+    const payload = parseShareHpPayload(raw);
+
+    check("the HP payload parses", payload !== null);
+
+    // What the database itself says, so the assertions below compare two routes
+    // to one figure rather than a figure to a number written in this file.
+    const truth = await first<{ hp_count: number; active_hp: number }>(
+      `select hp_count, active_hp from public.hm_monthly_hp_summary
+        where month_id = '${september.id}' and hm_id = '${alpha.id}'`,
+    );
+
+    if (payload) {
+      check(
+        "its counts are the month's, and they are the summary view's own",
+        payload.hpCount === truth.hp_count &&
+          payload.activeHp === truth.active_hp,
+        `${payload.activeHp}/${payload.hpCount} vs ${truth.active_hp}/${truth.hp_count}`,
+      );
+
+      check(
+        "every row it carries belongs to the month",
+        payload.hp.length === truth.hp_count,
+        `${payload.hp.length} rows for ${truth.hp_count}`,
+      );
+
+      check(
+        "active HPs come first, decided in SQL and not re-sorted here",
+        payload.hp.every(
+          (row, index, all) =>
+            index === 0 || !row.is_active || all[index - 1]!.is_active,
+        ),
+        payload.hp.map((row) => (row.is_active ? "A" : "-")).join(""),
+      );
+
+      check(
+        "a row's is_active agrees with the engine's threshold",
+        payload.hp.every((row) => row.is_active === isHpActive(row.total_key_in)),
+      );
+
+      const serialised = JSON.stringify(payload.hp);
+
+      check(
+        "and a row carries no id, no hm_id and no audit column",
+        !serialised.includes("created_by") &&
+          !serialised.includes("updated_by") &&
+          !serialised.includes("created_at") &&
+          !serialised.includes("hp_id") &&
+          !serialised.includes("hm_id") &&
+          !serialised.includes(alpha.id),
+        serialised.slice(0, 160),
+      );
+
+      check(
+        "nor the HM Code - an internal mapping key the reader does not need",
+        !JSON.stringify(payload.hm).includes("hm_code"),
+        JSON.stringify(payload.hm),
+      );
+
+      // ---- the page model -------------------------------------------------
+      const backHref = shareHmPath(shareToken, alpha.id);
+      const list = buildShareHpList(payload, { backHref });
+
+      check(
+        "the page states the count as a sentence, from the month's own figures",
+        list.headline ===
+          `${truth.active_hp} of ${truth.hp_count} HP active this month`,
+        list.headline,
+      );
+
+      check(
+        "it renders a row per HP, with every field the table needs",
+        list.rows.length === payload.hp.length &&
+          list.rows.every(
+            (row) =>
+              row.hpName !== "" &&
+              row.hpCode !== "" &&
+              row.weekLabels.length === 4 &&
+              row.totalKeyInLabel !== "" &&
+              row.totalNetLabel !== "",
+          ),
+      );
+
+      check(
+        "the badge on a row is the engine's answer, not the payload's",
+        list.rows.every(
+          (row, index) => row.isActive === payload.hp[index]!.is_active,
+        ),
+      );
+
+      check(
+        "back goes to the HM view it was opened from, inside the token",
+        list.backHref === backHref &&
+          list.backHref.startsWith(`${ROUTES.share}/`),
+      );
+
+      check(
+        "and the model carries no route into the private app",
+        !JSON.stringify(list).includes(`${ROUTES.hpListing}?`),
+      );
+
+      // ---- the number the reader clicked, and the list they landed on -------
+      await db.exec(`set role anon`);
+      const hmBody = (
+        (await db.query(
+          `select public.resolve_share_hm_report('${shareToken}', '${alpha.id}') as body`,
+        )) as { rows: { body: unknown }[] }
+      ).rows[0]!.body;
+      await asSuperuser();
+
+      const hmPayload = parseShareHmPayload(hmBody);
+
+      check("the HM view resolves under the same token", hmPayload !== null);
+
+      if (hmPayload) {
+        const hmDetail = buildShareHmDetail(hmPayload, {
+          backHref: sharePath(shareToken),
+          hpListingHref: shareHmHpPath(shareToken, alpha.id),
+        })!;
+
+        const activeHpMetric = hmDetail.secondary.find(
+          (metric) => metric.key === "activeHp",
+        )!;
+
+        check(
+          "the Active HP the HM taps and the list they land on are one figure",
+          activeHpMetric.value === list.activeLabel,
+          `${activeHpMetric.value} vs ${list.activeLabel}`,
+        );
+
+        check(
+          "and the figure links to exactly this list",
+          activeHpMetric.href === shareHmHpPath(shareToken, alpha.id),
+          activeHpMetric.href ?? "no href",
+        );
+      }
+    }
+
+    // ---- the boundary, through the real function ----------------------------
+    check(
+      "a month id is not an HM id",
+      (await resolveHp(shareToken, september.id)) === null,
+    );
+
+    check(
+      "an id that matches nobody resolves to nothing",
+      (await resolveHp(shareToken, "3f2504e0-4f89-11d3-9a0c-0305e82c3301")) ===
+        null,
+    );
+
+    check(
+      "a token that was never issued opens no HP list",
+      (await resolveHp("notATokenThatWasEverIssued_0123456789abc", alpha.id)) ===
+        null,
+    );
+
+    await db.exec(
+      `update public.share_links set revoked_at = now(), is_active = false
+        where token = '${shareToken}'`,
+    );
+
+    check(
+      "and revoking the link closes the HP list in the same instant",
+      (await resolveHp(shareToken, alpha.id)) === null,
+    );
+
+    // Executable by anon, and it changes nothing about the tables underneath.
+    await db.exec(`set role anon`);
+
+    let stillBlocked = false;
+
+    try {
+      await db.query(`select * from public.hps`);
+    } catch {
+      stillBlocked = true;
+    }
+
+    await asSuperuser();
+
+    check(
+      "anon may run the function and still cannot read an HP table directly",
+      stillBlocked,
+    );
+  }
 
   // ---- constraints ---------------------------------------------------------
   {

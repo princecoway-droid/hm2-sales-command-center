@@ -1890,14 +1890,23 @@ const anonFunctions = (
   )
 ).rows.map((r) => r.proname);
 
-// The two share resolvers, and nothing else. Both are token-gated, both are
-// SECURITY DEFINER, and both return NULL for every failure. Written as an exact
-// SET rather than a count: a third callable function reaching anon should fail
-// this test whatever it is called.
-const ANON_FUNCTIONS = ["resolve_share_hm_report", "resolve_share_report"];
+// The three share resolvers, and nothing else. All three are token-gated, all
+// three are SECURITY DEFINER, and all three return NULL for every failure.
+// Written as an exact SET rather than a count: a fourth callable function
+// reaching anon should fail this test whatever it is called.
+//
+// It went from two to three when the HP list was shared - `resolve_share_hm_hp`
+// - and that is the point of listing them by name. Widening the anonymous
+// surface is a decision somebody has to come here and make; it cannot happen as
+// a side effect of adding a function.
+const ANON_FUNCTIONS = [
+  "resolve_share_hm_hp",
+  "resolve_share_hm_report",
+  "resolve_share_report",
+];
 
 report(
-  `the two share resolvers are the ONLY callable functions anon may execute (${anonFunctions.join(", ") || "none"})`,
+  `the three share resolvers are the ONLY callable functions anon may execute (${anonFunctions.join(", ") || "none"})`,
   anonFunctions.length === ANON_FUNCTIONS.length &&
     ANON_FUNCTIONS.every((name, index) => anonFunctions[index] === name),
 );

@@ -10,7 +10,7 @@ import { HmSecondaryKpis } from "@/components/hm-detail/hm-secondary-kpis";
 import { HmWeeklyPerformance } from "@/components/hm-detail/hm-weekly-performance";
 import { APP_NAME } from "@/lib/app";
 import { getPublicShareHmReport } from "@/lib/data/share";
-import { sharePath } from "@/lib/routes";
+import { shareHmHpPath, sharePath } from "@/lib/routes";
 
 /**
  * One HM's month, read-only, at /share/<token>/hm/<hmId>.
@@ -37,8 +37,9 @@ import { sharePath } from "@/lib/routes";
  *
  * What is deliberately absent, and it is the same list as the parent's: no
  * month switcher, no navigation, no sign-out, no edit, no Data Entry link, and
- * no manager or PA named anywhere. The one link on the page goes back to the
- * report it was opened from.
+ * no manager or PA named anywhere. Two links leave this page and both stay
+ * inside the token: back to the report it was opened from, and forward into
+ * this HM's own HP list.
  *
  * `force-dynamic` for the parent's reason: a report is live and a token is
  * revocable, and a cached page would keep serving a withdrawn link's figures.
@@ -52,7 +53,14 @@ export default async function ShareHmPage(
 
   const backHref = sharePath(token);
 
-  const result = await getPublicShareHmReport(token, hmId, { backHref });
+  const result = await getPublicShareHmReport(token, hmId, {
+    backHref,
+    // Active HP is a COUNT, and "18" invites "which 18". The figure links to
+    // the HP list UNDER THIS TOKEN - never to `/hp`, which is behind a login
+    // this reader does not have. Built here, where the token is, so no public
+    // model can be handed a route into the private app.
+    hpListingHref: shareHmHpPath(token, hmId),
+  });
 
   // A failed read, an unusable token and an HM who is not on this month's
   // report all look identical from out here on purpose. The segment's own

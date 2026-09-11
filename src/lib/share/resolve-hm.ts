@@ -118,6 +118,15 @@ function parseContext(value: unknown): ShareHmContextMonth[] {
 export type ShareHmDetailOptions = {
   /** Back to the report this HM was opened from. Never into the private app. */
   backHref: string;
+  /**
+   * Where this screen's Active HP figure opens, for a public reader.
+   *
+   * `/share/<token>/hm/<id>/hp` - the same HP list the manager sees, under the
+   * token that already authorizes this page, and never `/hp`, which is behind a
+   * login the reader does not have. `null` leaves the figure unlinked, which is
+   * what a caller with no token to build a path from should pass.
+   */
+  hpListingHref?: string | null;
 };
 
 /**
@@ -135,7 +144,7 @@ export type ShareHmDetailOptions = {
  */
 export function buildShareHmDetail(
   payload: ShareHmPayload,
-  { backHref }: ShareHmDetailOptions,
+  { backHref, hpListingHref = null }: ShareHmDetailOptions,
 ): HmDetailViewModel | null {
   const selected: MonthPerformanceRecords = {
     month: payload.month,
@@ -182,8 +191,13 @@ export function buildShareHmDetail(
     notice: null,
     backHref,
     // The one caller that is not the signed-in screen. `public` strips the HM
-    // Code and the link into `/hp` from the MODEL, so no component rendering
-    // this can put either in front of a WhatsApp recipient.
+    // Code from the MODEL, so no component rendering this can put an internal
+    // identifier in front of a WhatsApp recipient.
     audience: "public",
+    // The Active HP figure still links - to the PUBLIC list, under this
+    // token. The presenter does not know which world it is in; the caller that
+    // holds the token decides, which is why no route into the private app can
+    // reach a public model even by accident.
+    hpListingHref,
   });
 }

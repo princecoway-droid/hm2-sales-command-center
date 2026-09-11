@@ -580,13 +580,18 @@ applies to the caller rather than to the view's owner.
 **The public share boundary.** Stage 6 introduces the only unauthenticated view
 of business data in the application, and it is drawn in the database rather than
 in the app. `anon` has no table privileges and no policy anywhere; it may execute
-exactly two functions, both `SECURITY DEFINER`, both gated on the same token, and
-both returning `NULL` for every failure:
+exactly three functions, all `SECURITY DEFINER`, all gated on the same token, and
+all returning `NULL` for every failure:
 
 | | |
 |---|---|
 | `resolve_share_report(token)` | the group report at `/share/<token>` — a hand-built JSON projection of **one** reporting month |
 | `resolve_share_hm_report(token, hm_id)` | one HM's page at `/share/<token>/hm/<hmId>` — that same month, plus **that one HM's** monthly figures for the previous month and the earlier months of the quarter |
+| `resolve_share_hm_hp(token, hm_id)` | that HM's HP list at `/share/<token>/hm/<hmId>/hp` — **that one HM's** HP rows for the token's own month, capped at 1000 |
+
+`db:test` asserts that set **by name**, not by count. Widening the anonymous
+surface is a decision somebody has to go and make in that test; it cannot happen
+as a side effect of adding a function.
 
 Neither projection carries `created_by`, `updated_by`, a performance row id, or
 anything from `profiles` or `auth`. Every sub-select in the group resolver is
@@ -777,6 +782,8 @@ src/
     (app)/             dashboard, data-entry, hp, hp-import, hm-management,
                        settings
     share/[token]/     the read-only month report — unauthenticated, no shell
+                       .../hm/<id>       one HM's month
+                       .../hm/<id>/hp    that HM's HP list
   components/
     ui/                button, card, field, select, alert, badge, modal,
                        page-header, status colours
@@ -792,7 +799,7 @@ src/
     hm-detail/         header, primary performance, metric tile, weekly strip,
                        secondary KPIs, sales mix, MoM, QTD, states, skeleton
     share/             the public read-only report: header, KPIs, weekly rows,
-                       HM cards, unavailable state
+                       HM cards, the HP list, unavailable state
   lib/
     actions/           Server Actions: hms, months, sales-weeks, performance,
                        share (generate / revoke)
@@ -818,6 +825,7 @@ src/
     reports/           whatsapp.ts  the view model -> plain text, pure
     share/             token.ts (CSPRNG + shape gate), config.ts (expiry policy),
                        resolve.ts (the RPC payload -> a public report, pure),
+                       resolve-hp.ts (one HM's HP rows -> the shared HP list),
                        origin.ts (the app's own address, server-only)
     data/              read access, returns Result<T> instead of throwing
                        dashboard.ts fetches a month + previous + QTD in 7 queries
@@ -1172,14 +1180,35 @@ ceilings on rows and columns. Sparse cells are addressed by their `r="C4"`
 reference rather than by position — without that, a row with a blank HP CODE
 would shift every later column left and quietly import the Net as the Total.
 
-### The public report
+### The public report, and the HP list behind it
 
-A share token still cannot reach an HP row. `resolve_share_report` carries
-Active HP as an **aggregate count per HM** — `{hm_id, hp_count, active_hp}` —
-which is what the public page already showed before Stage 8; only its source
-changed. The HM Code and the link into `/hp` are stripped from the public HM
-model rather than merely left unrendered, so no future component can start
-showing either by accident.
+The group report carries Active HP as an **aggregate count per HM** —
+`{hm_id, hp_count, active_hp}` — which is what the public page already showed
+before Stage 8; only its source changed. No HP row reaches that page.
+
+One level deeper, it does. `/share/<token>/hm/<hmId>/hp` shows **one HM their
+own HPs**, because "Active HP 18" with nowhere to go is a number the person
+managing those eighteen people cannot act on. The widening is deliberate and it
+is narrow:
+
+- **One HM**, and only one the token's month is already about — the same gate
+  the HM page applies, so a token cannot walk the HM table.
+- **One month**, the token's. There is no parameter for a month.
+- **Figures only**: HP code, name, W1–W4, Total Key-In, Total Net. No row id, no
+  `hm_id`, no audit column — nothing in the payload is a handle to anything.
+- **No HM Code.** An internal mapping key; the reader does not need it to
+  recognise their own team, and it is left out of the projection rather than out
+  of the markup.
+- **1000 rows**, so one request cannot become a bulk export.
+
+What a link holder can now see that they could not before: the names and Coway
+codes of one HM's HPs, and what each of them keyed in that month. That is the
+point of the change — it is the HM's own team, on a link their manager sent
+them. Revoking the link closes all three pages in the same instant.
+
+The public HM model still carries no HM Code, and its Active HP link is built by
+the caller that holds the token, so it is always a `/share/…` path — the
+presenter never learns the private route exists.
 
 ---
 
