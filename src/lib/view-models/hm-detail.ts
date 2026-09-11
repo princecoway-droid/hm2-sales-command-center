@@ -310,10 +310,13 @@ function buildWeekly(
               weekLabel: banded.weekLabel,
               weekSource: null,
               keyInUnits: banded.keyInUnits,
+              // The running total through this week - what the engine banded.
+              keyInToDate: banded.keyInToDate,
               targetUnits: hm.targetNetUnits,
               achievementPct: banded.achievementPct,
               hasThreshold: banded.hasThreshold,
               isEntered: banded.isEntered,
+              blankBefore: banded.blankBefore,
             })
           : null,
       };

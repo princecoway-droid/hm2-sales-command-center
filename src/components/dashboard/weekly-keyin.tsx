@@ -207,9 +207,11 @@ function Legend() {
           the application - and the only way to tell them apart is to say what
           each is measuring. */}
       <p className="mt-1.5 text-[11px] text-slate-500">
-        <span className="font-medium text-slate-600">Pacing</span> · each week&rsquo;s
-        Key-In as a share of the group&rsquo;s monthly target, at that
-        week&rsquo;s threshold. No threshold is defined for W5 or W6.
+        <span className="font-medium text-slate-600">Pacing</span> · Key-In{" "}
+        <em className="not-italic font-medium text-slate-600">so far</em> — W1
+        through that week, added up — as a share of the group&rsquo;s monthly
+        target, at that week&rsquo;s threshold. No threshold is defined for W5
+        or W6.
       </p>
     </div>
   );

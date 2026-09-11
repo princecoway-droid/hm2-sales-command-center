@@ -2,6 +2,7 @@ import {
   formatPercentage,
   formatSignedPercentage,
   formatSignedUnits,
+  cumulativeKeyIn,
   formatUnits,
   getKeyInStatus,
   hasKeyInThreshold,
@@ -110,11 +111,15 @@ export function kpiStatusLabel(status: KpiStatus | null): string {
 /**
  * The Key-In band, with the week and the arithmetic that produced it.
  *
- * The note is the point of this model. The status is measured against the
- * CURRENT week's Key-In as a share of the MONTHLY target, while the figure on
- * the card beside it is the month's Key-In so far - two different numbers, and
- * a badge with no explanation would look like it described the one above it.
- * "W2: 27 of 100 target · 27.0%" says exactly what was banded.
+ * The note is the point of this model. The status is measured on the Key-In SO
+ * FAR - the running total through the week being banded - as a share of the
+ * MONTHLY target, and the note spells that out: "W1–W2: 41 of 100 target ·
+ * 41.0%". A badge with no explanation would leave a reader guessing which of
+ * the two numbers near it was banded.
+ *
+ * Where the running total is missing an earlier week, it says so. A red
+ * produced by a W1 nobody keyed in is a gap in the records rather than a
+ * verdict on the HM, and the two must not look alike.
  */
 export function buildKeyInStatusModel(keyIn: KeyInKpiStatus): KpiStatusModel {
   const week = keyIn.weekLabel;
@@ -145,23 +150,36 @@ export function buildKeyInStatusModel(keyIn: KeyInKpiStatus): KpiStatusModel {
     };
   }
 
-  const units = formatUnits(keyIn.keyInUnits);
+  // The RUNNING total through this week, because that is what was banded.
+  const units = formatUnits(keyIn.keyInToDate);
+
+  // "W1" on its own for the first week, "W1–W2" from the second - so the note
+  // reads as the span it covers rather than as one week's figure.
+  const span =
+    keyIn.weekNumber !== null && keyIn.weekNumber > 1 ? `W1–${week}` : week;
 
   if (keyIn.targetUnits === null || keyIn.targetUnits <= 0) {
     return {
       status: null,
       label: "No target",
-      note: `${week}: ${units} · target not set`,
+      note: `${span}: ${units} · target not set`,
     };
   }
+
+  // Said out loud, because a pace measured over a gap is not a pace: an HM can
+  // be red only because W1 was never keyed in.
+  const missing =
+    keyIn.blankBefore > 0
+      ? ` · ${keyIn.blankBefore} earlier week${keyIn.blankBefore === 1 ? "" : "s"} not entered`
+      : "";
 
   return {
     status: keyIn.status,
     label: kpiStatusLabel(keyIn.status),
-    note: `${week}: ${units} of ${formatUnits(keyIn.targetUnits)} target · ${formatPercentage(
+    note: `${span}: ${units} of ${formatUnits(keyIn.targetUnits)} target · ${formatPercentage(
       keyIn.achievementPct,
       { fallback: NO_VALUE },
-    )}`,
+    )}${missing}`,
   };
 }
 
@@ -628,12 +646,26 @@ function buildWeekly(
       ? group.totalTarget
       : null;
 
+  // The group's running Key-In through each week, by the engine's own rule -
+  // the bands are a pace against the monthly target, so the numerator is the
+  // month so far and not one week in isolation.
+  const toDate = new Map(
+    cumulativeKeyIn(
+      weeks.map((week) => ({
+        weekNumber: week.weekNumber,
+        // `null` rather than the 0 for an unentered week: a week nobody has
+        // keyed in is blank, and folding a blank in as zero would understate
+        // the running total for days that have not happened yet.
+        keyInUnits: week.isEntered ? week.keyInUnits : null,
+      })),
+    ).map((entry) => [entry.weekNumber, entry] as const),
+  );
+
   return {
     weeks: weeks.map((week) => {
-      // `null` rather than the 0 for an unentered week: a week nobody has keyed
-      // in is blank, and banding a blank as 0% of target would report a
-      // catastrophic week for days that have not happened yet.
       const units: Entry = week.isEntered ? week.keyInUnits : null;
+      const running = toDate.get(week.weekNumber);
+      const keyInToDate = running?.toDate ?? null;
 
       return {
         weekId: week.weekId,
@@ -650,16 +682,18 @@ function buildWeekly(
           week.isEntered && tallest > 0 ? (week.keyInUnits / tallest) * 100 : 0,
         hmsEntered: week.hmsEntered,
         kpiStatus: buildKeyInStatusModel({
-          status: getKeyInStatus(week.weekNumber, units, groupTarget),
+          status: getKeyInStatus(week.weekNumber, keyInToDate, groupTarget),
           weekId: week.weekId,
           weekNumber: week.weekNumber,
           weekLabel: week.weekLabel,
           weekSource: null,
           keyInUnits: units,
+          keyInToDate,
           targetUnits: groupTarget,
-          achievementPct: keyInAchievement(units, groupTarget),
+          achievementPct: keyInAchievement(keyInToDate, groupTarget),
           hasThreshold: hasKeyInThreshold(week.weekNumber),
           isEntered: week.isEntered,
+          blankBefore: running?.blankBefore ?? 0,
         }),
       };
     }),

@@ -47,6 +47,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  cumulativeKeyIn,
   getActiveHpStatus,
   getHmKpiStatuses,
   getKeyInStatus,
@@ -201,6 +202,128 @@ section("[S9-A] Key-In bands, at every edge the business stated");
   check(
     "W3: 3 of 4 is 75% and lands on on_track",
     getKeyInStatus(3, 3, 4) === "on_track",
+  );
+}
+
+// =============================================================================
+section("[S9-A2] Key-In is banded on the month SO FAR, not on one week");
+// =============================================================================
+
+/**
+ * The rule this whole stage turns on, and the one it originally got wrong.
+ *
+ * The thresholds are a PACE CURVE against the monthly target: On Track at W4 is
+ * 100% of the month, which no HM reaches inside a single week. Banding each
+ * week's own figure made that edge unreachable by construction and painted a
+ * healthy team red. The numerator is the running total.
+ */
+{
+  const running = cumulativeKeyIn([
+    { weekNumber: 1, keyInUnits: 20 },
+    { weekNumber: 2, keyInUnits: 27 },
+    { weekNumber: 3, keyInUnits: 30 },
+    { weekNumber: 4, keyInUnits: 25 },
+  ]);
+
+  check(
+    "the running total accumulates: 20, 47, 77, 102",
+    running.map((week) => week.toDate).join() === "20,47,77,102",
+    running.map((week) => week.toDate).join(),
+  );
+
+  check(
+    "so a month that would be red every week on its own figures is on track",
+    // 27 of 100 at W2 is needs_attention alone; 47 of 100 is watch.
+    getKeyInStatus(2, 27, 100) === "needs_attention" &&
+      getKeyInStatus(2, 47, 100) === "watch" &&
+      getKeyInStatus(4, 25, 100) === "needs_attention" &&
+      getKeyInStatus(4, 102, 100) === "on_track",
+  );
+
+  check(
+    "W4 On Track is only reachable cumulatively - one week of it never is",
+    // A quarter of the target in each of four weeks: red at W4 standalone,
+    // exactly On Track once added up.
+    getKeyInStatus(4, 25, 100) === "needs_attention" &&
+      getKeyInStatus(4, 100, 100) === "on_track",
+  );
+}
+
+{
+  // Order of the rows must not matter: the WEEK NUMBER accumulates the month.
+  const shuffled = cumulativeKeyIn([
+    { weekNumber: 3, keyInUnits: 30 },
+    { weekNumber: 1, keyInUnits: 20 },
+    { weekNumber: 2, keyInUnits: 27 },
+  ]);
+
+  check(
+    "the total accumulates by week number, whatever order the rows arrive in",
+    shuffled.map((week) => `${week.weekNumber}:${week.toDate}`).join() ===
+      "1:20,2:47,3:77",
+    shuffled.map((week) => `${week.weekNumber}:${week.toDate}`).join(),
+  );
+}
+
+{
+  // Blanks: a week nobody keyed in contributes nothing and is not a zero.
+  const withGaps = cumulativeKeyIn([
+    { weekNumber: 1, keyInUnits: null },
+    { weekNumber: 2, keyInUnits: 40 },
+    { weekNumber: 3, keyInUnits: null },
+    { weekNumber: 4, keyInUnits: 10 },
+  ]);
+
+  check(
+    "a blank week has no running total of its own - there is no point to band",
+    withGaps[0]!.toDate === null && withGaps[2]!.toDate === null,
+  );
+
+  check(
+    "and it contributes nothing rather than zero, so later weeks carry on",
+    withGaps[1]!.toDate === 40 && withGaps[3]!.toDate === 50,
+  );
+
+  check(
+    "the weeks missing from the total are counted, so a screen can say so",
+    withGaps[1]!.blankBefore === 1 && withGaps[3]!.blankBefore === 2,
+  );
+
+  check(
+    "an entered ZERO week is a figure, not a blank: it has a running total",
+    cumulativeKeyIn([{ weekNumber: 1, keyInUnits: 0 }])[0]!.toDate === 0,
+  );
+}
+
+{
+  // The gap has to be visible on screen: a red caused by an unkeyed W1 is a
+  // hole in the records, not a verdict on the HM.
+  const roster = createRoster(["Alpha"]);
+  const records = buildMonthRecords(roster, {
+    year: 2026,
+    month: 9,
+    hms: {
+      Alpha: {
+        monthly: { net: 10, target: 100, recruitment: 5, activeHp: 25 },
+        weekly: [null, 12, null, null, null],
+      },
+    },
+  });
+
+  const card = buildDashboardViewModel({
+    selectedMonth: records.month,
+    performance: buildMonthlyPerformanceViewModel(
+      bundleOf(roster, [records], records),
+      { today: "2026-09-08" },
+    )!,
+    lastUpdatedAt: null,
+  }).hms[0]!;
+
+  check(
+    "a running total measured over a missing week says so, in words",
+    card.statuses.keyIn.note ===
+      "W1–W2: 12 of 100 target · 12.0% · 1 earlier week not entered",
+    card.statuses.keyIn.note ?? "(none)",
   );
 }
 
@@ -510,11 +633,22 @@ section("[S9-H] one HM's four statuses, from the calculated model");
   );
 
   check(
-    "Key-In: 27 of a 100 monthly target is 27%, which is needs_attention at W2",
-    statuses.keyIn.status === "needs_attention" &&
-      statuses.keyIn.keyInUnits === 27 &&
+    "Key-In at W2 is banded on W1+W2 - 20+27 = 47 of 100, which is 47% and watch",
+    statuses.keyIn.status === "watch" &&
+      statuses.keyIn.keyInToDate === 47 &&
       statuses.keyIn.targetUnits === 100 &&
-      statuses.keyIn.achievementPct === 27,
+      statuses.keyIn.achievementPct === 47,
+    `${statuses.keyIn.status} on ${statuses.keyIn.keyInToDate}`,
+  );
+
+  check(
+    "the week's OWN figure is still carried, for the screens that show it",
+    statuses.keyIn.keyInUnits === 27,
+  );
+
+  check(
+    "and W2 alone would have been 27% - needs_attention - so the two really differ",
+    getKeyInStatus(2, 27, 100) === "needs_attention",
   );
 
   check(
@@ -541,9 +675,17 @@ section("[S9-H] one HM's four statuses, from the calculated model");
     "every week of the month is banded, W5 included but unbanded",
     statuses.weekly.length === 5 &&
       statuses.weekly[0]!.status === "watch" &&
-      statuses.weekly[1]!.status === "needs_attention" &&
+      statuses.weekly[1]!.status === "watch" &&
       statuses.weekly[2]!.status === null &&
       statuses.weekly[4]!.hasThreshold === false,
+  );
+
+  check(
+    "the running total is what each week carries: 20, then 47",
+    statuses.weekly[0]!.keyInToDate === 20 &&
+      statuses.weekly[1]!.keyInToDate === 47 &&
+      statuses.weekly[0]!.achievementPct === 20 &&
+      statuses.weekly[1]!.achievementPct === 47,
   );
 
   check(
@@ -645,7 +787,8 @@ section("[S9-I] blanks produce no band, never a red one");
 
   check(
     "the HM who has been keyed in is banded normally",
-    alpha.keyIn.status === "watch" &&
+    // 30+30 = 60 of a 100 target at W2 is 60%, which clears the 50% On Track edge.
+    alpha.keyIn.status === "on_track" &&
       alpha.net === "on_track" &&
       alpha.recruitment === "on_track" &&
       alpha.activeHp === "on_track",
@@ -753,8 +896,11 @@ section("[S9-J] W5 and W6 keep working, and get no invented band");
   );
 
   check(
-    "its figure is still visible - the data is not hidden, only the band",
-    statuses.keyIn.keyInUnits === 25 && statuses.keyIn.achievementPct === 25,
+    "its figures are still visible - the data is not hidden, only the band",
+    // The week's own 25, and 125 banked across W1-W5 against a target of 100.
+    statuses.keyIn.keyInUnits === 25 &&
+      statuses.keyIn.keyInToDate === 125 &&
+      statuses.keyIn.achievementPct === 125,
   );
 
   check(
@@ -778,10 +924,18 @@ section("[S9-J] W5 and W6 keep working, and get no invented band");
   );
 
   check(
-    "W1-W4 in the same month still band normally",
+    "W1-W4 in the same month still band normally, on the running total",
+    // 25, 50, 75, 100 against a target of 100: watch at W1, then the pace curve
+    // is met exactly at every edge after it.
     statuses.weekly.slice(0, 4).every((week) => week.hasThreshold) &&
       statuses.weekly[0]!.status === "watch" &&
-      statuses.weekly[3]!.status === "needs_attention",
+      statuses.weekly[1]!.status === "on_track" &&
+      statuses.weekly[2]!.status === "on_track" &&
+      statuses.weekly[3]!.status === "on_track",
+    statuses.weekly
+      .slice(0, 4)
+      .map((week) => `${week.weekLabel}:${week.keyInToDate}:${week.status}`)
+      .join(" "),
   );
 
   const dashboard = buildDashboardViewModel({
@@ -853,8 +1007,9 @@ section("[S9-K] the month on screen is the month that is banded");
   const augustStatuses = augustModel.hmKpiStatuses[hmId(roster, "Alpha")]!;
 
   check(
-    "September, mid-W2: 5 of 100 is 5%, needs_attention",
+    "September, mid-W2: 10+5 = 15 of 100 is 15%, needs_attention",
     septemberStatuses.keyIn.weekLabel === "W2" &&
+      septemberStatuses.keyIn.keyInToDate === 15 &&
       septemberStatuses.keyIn.status === "needs_attention",
   );
 
@@ -865,9 +1020,11 @@ section("[S9-K] the month on screen is the month that is banded");
   );
 
   check(
-    "and August is banded on August's figures: 20 of 100 at W4 is needs_attention",
+    "and August is banded on August's own running total: 30+60+20+20 = 130 of 100",
     augustStatuses.keyIn.keyInUnits === 20 &&
-      augustStatuses.keyIn.status === "needs_attention",
+      augustStatuses.keyIn.keyInToDate === 130 &&
+      augustStatuses.keyIn.status === "on_track",
+    `${augustStatuses.keyIn.keyInToDate} -> ${augustStatuses.keyIn.status}`,
   );
 
   check(
@@ -895,14 +1052,16 @@ section("[S9-K] the month on screen is the month that is banded");
 
   check(
     "August's W2 uses W2's rule, not the rule for the week September is in",
-    // 60 of 100 at W2 is 60%, which is On Track (>=50).
-    augustStatuses.weekly[1]!.status === "on_track",
+    // 30+60 = 90 of 100 at W2 is 90%, which is On Track (>=50).
+    augustStatuses.weekly[1]!.keyInToDate === 90 &&
+      augustStatuses.weekly[1]!.status === "on_track",
   );
 
   check(
     "the attention list follows the month too",
-    augustModel.managementAttention.length === 1 &&
-      augustModel.managementAttention[0]!.kpis.join() === "keyIn" &&
+    // August finished at 130% of target with 8 recruits and 30 active HPs, so
+    // nobody is on its list; September is red on all four.
+    augustModel.managementAttention.length === 0 &&
       septemberModel.managementAttention[0]!.attentionCount === 4,
   );
 }
@@ -918,31 +1077,35 @@ section("[S9-L] Management Attention: only red, ordered, and never advice");
     year: 2026,
     month: 9,
     hms: {
-      // Net descending drives the ranking, so the tie-break below is a real one.
+      // Every Key-In band below is the RUNNING total at W2 - W1+W2 - against a
+      // target of 100. Net descending drives the ranking, so the tie-break in
+      // the next block is a real one.
       Green: {
+        // 90 of 100 by W2, and 95 net of 90 keyed in. Nothing red.
         monthly: { net: 95, target: 100, recruitment: 6, activeHp: 30 },
         weekly: [30, 60, null, null, null],
       },
       Amber: {
-        // Every band amber: watch is NOT attention, and must not appear.
-        monthly: { net: 60, target: 100, recruitment: 3, activeHp: 15 },
-        weekly: [16, 35, null, null, null],
+        // Every band amber: 36% at W2, net ratio 55.6%, 3 recruits, 15 active
+        // HPs. Watch is NOT attention, and must not appear on the list.
+        monthly: { net: 20, target: 100, recruitment: 3, activeHp: 15 },
+        weekly: [16, 20, null, null, null],
       },
       Red1: {
-        // One red: recruitment. Everything else is fine.
+        // One red: recruitment. 75 of 100 by W2 is on track.
         monthly: { net: 50, target: 100, recruitment: 0, activeHp: 25 },
         weekly: [20, 55, null, null, null],
       },
       Red2: {
-        // Two reds: recruitment and Active HP.
+        // Two reds: recruitment and Active HP. 70 of 100 by W2 is on track.
         monthly: { net: 40, target: 100, recruitment: 1, activeHp: 5 },
         weekly: [20, 50, null, null, null],
       },
       Red3: {
-        // Three reds: Key-In, recruitment and Active HP. Net is 30 of 32 keyed
-        // in, which is 93.8% - on track, and it stays out of the list.
-        monthly: { net: 30, target: 100, recruitment: 0, activeHp: 2 },
-        weekly: [20, 12, null, null, null],
+        // Three reds: Key-In, recruitment and Active HP. Only 15 of 100 by W2.
+        // Net is 14 of those 15, which is 93.3% - on track, so it stays off.
+        monthly: { net: 14, target: 100, recruitment: 0, activeHp: 2 },
+        weekly: [10, 5, null, null, null],
       },
     },
   });
@@ -1219,8 +1382,8 @@ section("[S9-N] the presented Key-In band explains what it measured");
   );
 
   check(
-    "and the band beside it names the week, the figure and the MONTHLY target",
-    card.statuses.keyIn.note === "W2: 27 of 100 target · 27.0%",
+    "and the band beside it names the SPAN, the running total and the monthly target",
+    card.statuses.keyIn.note === "W1–W2: 47 of 100 target · 47.0%",
     card.statuses.keyIn.note ?? "(none)",
   );
 
@@ -1232,7 +1395,7 @@ section("[S9-N] the presented Key-In band explains what it measured");
 
   check(
     "the words are the business's, not a forecast",
-    card.statuses.keyIn.label === "Needs Attention" &&
+    card.statuses.keyIn.label === "Watch" &&
       card.statuses.recruitment.label === "Watch" &&
       card.statuses.activeHp.label === "Watch",
   );

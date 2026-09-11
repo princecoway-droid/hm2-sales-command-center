@@ -360,8 +360,9 @@ Three bands, and only three:
 | `watch` | 🟡 Watch |
 | `on_track` | 🟢 On Track |
 
-**Key-In**, per week, as a share of the HM's **monthly** target — never a weekly
-target, which the business does not set:
+**Key-In** is banded on the month **so far** — the running total of W1 through
+the week being banded — as a share of the HM's **monthly** target. Never a
+weekly target, which the business does not set, and never one week's own figure:
 
 | Week | Needs Attention | Watch | On Track |
 |---|---|---|---|
@@ -371,9 +372,24 @@ target, which the business does not set:
 | W4 | `< 60%` | `>= 60%` and `< 100%` | `>= 100%` |
 | W5, W6 | — | — | — |
 
+These are a **pace curve**, and the numerator is cumulative. The thresholds say
+so themselves: On Track at W4 is 100% of the *monthly* target, and no HM sells a
+month's target inside week four — banding each week's own figure makes that edge
+unreachable by construction and paints a healthy team red. Read cumulatively,
+15/25 → 30/50 → 45/75 → 60/100 is roughly a quarter of the target per week with
+a widening allowance for a slow start.
+
+So an HM on 20 units in W1 and 27 in W2, against a target of 100, is banded at
+W2 on **47** (47%, Watch) — not on 27 (27%, Needs Attention).
+
 W1 is the one week stated with **strict** comparisons: 15% is red and 25% is
 amber. W5 and W6 have **no defined threshold** and get none — the figures stay
 visible and the status reads "Not configured".
+
+A blank week contributes nothing rather than zero, so a month missing W2 carries
+W1's total into W3. Where the running total is missing an earlier week the note
+says so (`· 1 earlier week not entered`): a red caused by an unkeyed W1 is a gap
+in the records, not a verdict on the HM.
 
 | Metric | Needs Attention | Watch | On Track |
 |---|---|---|---|
@@ -976,8 +992,9 @@ threshold."*
 Each HM card then carries the four bands under the four figures — Key-In, Net,
 Recruitment and Active HP — with the arithmetic spelled out where the band and
 the figure are different numbers. The card's Key-In figure is the month's total;
-the band under it is the **current week** against the monthly target, and its
-note says so: `W2: 27 of 100 target · 27.0%`. The thresholds are in
+the band under it is the running total **through the current week** against the
+monthly target, and its note says so: `W1–W2: 47 of 100 target · 47.0%`. The
+thresholds are in
 [the calculation engine](#kpi-status-a-pacing-indicator-not-a-forecast); no
 component holds one.
 

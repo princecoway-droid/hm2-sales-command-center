@@ -107,6 +107,7 @@ export {
 
 // KPI status - the Stage 9 pacing bands. Thresholds live here and nowhere else.
 export {
+  cumulativeKeyIn,
   getActiveHpStatus,
   getHmKpiStatuses,
   getHmKpiStatusesForMonth,

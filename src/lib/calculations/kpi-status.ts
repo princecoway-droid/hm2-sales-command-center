@@ -178,7 +178,22 @@ function band(
 // -----------------------------------------------------------------------------
 
 /**
- * Key-In achievement for one week: `weekly Key-In / MONTHLY target x 100`.
+ * Key-In achievement at a point in the month:
+ * `Key-In SO FAR / MONTHLY target x 100`.
+ *
+ * ---------------------------------------------------------------------------
+ * The numerator is CUMULATIVE
+ * ---------------------------------------------------------------------------
+ * `keyInToDate` is the running total of the weeks up to and including the one
+ * being banded - W1 at W1, W1+W2 at W2, W1+W2+W3 at W3 - not that week's own
+ * figure.
+ *
+ * The thresholds say so themselves. On Track at W4 is 100% of the MONTHLY
+ * target: no HM sells a whole month's target inside week four, so a band that
+ * could only be reached by doing exactly that would be unreachable by
+ * construction. Read cumulatively, 15/25 - 30/50 - 45/75 - 60/100 is what it
+ * plainly is: a pace curve, roughly a quarter of the target per week, with a
+ * widening allowance for a slow start.
  *
  * The denominator is the HM's monthly target, never a weekly one - the business
  * does not set weekly targets, and inventing "target / 4" would put a figure
@@ -188,18 +203,22 @@ function band(
  * `targetAchievement`: an HM with no target has an UNKNOWN pace, not a 0% one.
  */
 export function keyInAchievement(
-  weeklyKeyIn: Entry,
+  keyInToDate: Entry,
   monthlyTarget: Entry,
 ): Percentage {
-  if (!isEntered(weeklyKeyIn) || !isEntered(monthlyTarget)) {
+  if (!isEntered(keyInToDate) || !isEntered(monthlyTarget)) {
     return null;
   }
 
-  return percentageOf(weeklyKeyIn, monthlyTarget);
+  return percentageOf(keyInToDate, monthlyTarget);
 }
 
 /**
- * The Key-In band for one week.
+ * The Key-In band at the end of a given week.
+ *
+ * `keyInToDate` is the CUMULATIVE Key-In through that week - see
+ * `keyInAchievement`. Passing one week's own figure here is the mistake this
+ * parameter is named to prevent.
  *
  * `null` in three cases, all of them "no status can be stated" rather than a
  * bad one:
@@ -210,7 +229,7 @@ export function keyInAchievement(
  */
 export function getKeyInStatus(
   weekNumber: number,
-  weeklyKeyIn: Entry,
+  keyInToDate: Entry,
   monthlyTarget: Entry,
 ): KpiStatus | null {
   const threshold = keyInThresholdFor(weekNumber);
@@ -219,13 +238,54 @@ export function getKeyInStatus(
     return null;
   }
 
-  const achievement = keyInAchievement(weeklyKeyIn, monthlyTarget);
+  const achievement = keyInAchievement(keyInToDate, monthlyTarget);
 
   if (achievement === null) {
     return null;
   }
 
   return band(achievement, threshold.watch, threshold.onTrack, threshold.edge);
+}
+
+/**
+ * The running Key-In total through each week, in week order.
+ *
+ * Blanks contribute nothing rather than counting as zero - the rule the rest of
+ * this engine is built on - so a month with W2 missing carries W1's total into
+ * W3 rather than resetting or inventing a figure. `blankBefore` travels with
+ * each entry because that is exactly when the running total UNDERSTATES the
+ * month, and a red caused by a week nobody keyed in is not a red about the HM.
+ *
+ * A week that is itself blank gets `toDate: null`: there is no point in the
+ * month to band, because that point has not been recorded.
+ */
+export function cumulativeKeyIn(
+  weeks: readonly { weekNumber: number; keyInUnits: Entry }[],
+): { weekNumber: number; toDate: Entry; blankBefore: number }[] {
+  const ordered = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+
+  let running = 0;
+  let entered = false;
+  let blankBefore = 0;
+
+  return ordered.map((week) => {
+    const blanksSoFar = blankBefore;
+
+    if (isEntered(week.keyInUnits)) {
+      running += week.keyInUnits;
+      entered = true;
+    } else {
+      blankBefore += 1;
+    }
+
+    return {
+      weekNumber: week.weekNumber,
+      // `entered` rather than `running > 0`: an HM whose only entered week is a
+      // real zero has a running total of 0, which is a figure, not a blank.
+      toDate: isEntered(week.keyInUnits) && entered ? running : null,
+      blankBefore: blanksSoFar,
+    };
+  });
 }
 
 // -----------------------------------------------------------------------------
@@ -413,12 +473,24 @@ export type KeyInKpiStatus = {
   weekLabel: string | null;
   /** Why this week: in progress, the last that ended, or the month not started. */
   weekSource: CurrentWeekSource | null;
-  /** That week's Key-In. `null` when it has not been entered. */
+  /** That week's own Key-In. Shown; NOT what the band is measured on. */
   keyInUnits: Entry;
+  /**
+   * The CUMULATIVE Key-In through that week - W1+W2 at W2 - which is what the
+   * band is measured on. See `keyInAchievement`.
+   */
+  keyInToDate: Entry;
   /** The HM's MONTHLY target - the denominator, and never a weekly figure. */
   targetUnits: Entry;
-  /** `keyInUnits / targetUnits x 100`, or `null`. */
+  /** `keyInToDate / targetUnits x 100`, or `null`. */
   achievementPct: Percentage;
+  /**
+   * Earlier weeks with no figure, which the running total is therefore missing.
+   *
+   * Carried so a screen can say the pace is measured on incomplete data. A red
+   * caused by an unkeyed W1 is a gap in the records, not a verdict on the HM.
+   */
+  blankBefore: number;
   /** False for W5/W6, where the business has defined no band. */
   hasThreshold: boolean;
   /** True once the week carries a figure. A blank week is not a zero week. */
@@ -431,10 +503,15 @@ export type WeeklyKeyInKpiStatus = {
   weekNumber: number;
   weekLabel: string;
   status: KpiStatus | null;
+  /** That week's own Key-In. Shown; NOT what the band is measured on. */
   keyInUnits: Entry;
+  /** The CUMULATIVE Key-In through this week, which the band IS measured on. */
+  keyInToDate: Entry;
   achievementPct: Percentage;
   hasThreshold: boolean;
   isEntered: boolean;
+  /** Earlier weeks with no figure. See `KeyInKpiStatus.blankBefore`. */
+  blankBefore: number;
   /** True for the week `resolveCurrentWeek` picked out. */
   isCurrent: boolean;
 };
@@ -493,17 +570,32 @@ export function getHmKpiStatuses(
 ): HmKpiStatuses {
   const target = hm.targetNetUnits;
 
-  const weekly: WeeklyKeyInKpiStatus[] = hm.weeklyPerformance.map((week) => ({
-    weekId: week.weekId,
-    weekNumber: week.weekNumber,
-    weekLabel: week.weekLabel,
-    status: getKeyInStatus(week.weekNumber, week.keyInUnits, target),
-    keyInUnits: week.keyInUnits,
-    achievementPct: keyInAchievement(week.keyInUnits, target),
-    hasThreshold: hasKeyInThreshold(week.weekNumber),
-    isEntered: week.isEntered,
-    isCurrent: currentWeek?.week.weekId === week.weekId,
-  }));
+  // The running total, once, in week order - so every week is banded on the
+  // month SO FAR rather than on its own figure.
+  const toDate = new Map(
+    cumulativeKeyIn(hm.weeklyPerformance).map(
+      (entry) => [entry.weekNumber, entry] as const,
+    ),
+  );
+
+  const weekly: WeeklyKeyInKpiStatus[] = hm.weeklyPerformance.map((week) => {
+    const running = toDate.get(week.weekNumber);
+    const keyInToDate = running?.toDate ?? null;
+
+    return {
+      weekId: week.weekId,
+      weekNumber: week.weekNumber,
+      weekLabel: week.weekLabel,
+      status: getKeyInStatus(week.weekNumber, keyInToDate, target),
+      keyInUnits: week.keyInUnits,
+      keyInToDate,
+      achievementPct: keyInAchievement(keyInToDate, target),
+      hasThreshold: hasKeyInThreshold(week.weekNumber),
+      isEntered: week.isEntered,
+      blankBefore: running?.blankBefore ?? 0,
+      isCurrent: currentWeek?.week.weekId === week.weekId,
+    };
+  });
 
   const current = currentWeek
     ? (weekly.find((week) => week.weekId === currentWeek.week.weekId) ?? null)
@@ -521,10 +613,12 @@ export function getHmKpiStatuses(
       weekLabel: current?.weekLabel ?? null,
       weekSource: currentWeek?.source ?? null,
       keyInUnits: current?.keyInUnits ?? null,
+      keyInToDate: current?.keyInToDate ?? null,
       targetUnits: target,
       achievementPct: current?.achievementPct ?? null,
       hasThreshold: current?.hasThreshold ?? false,
       isEntered: current?.isEntered ?? false,
+      blankBefore: current?.blankBefore ?? 0,
     },
 
     // Off this HM's own totals. `totalKeyIn` is the engine's sum of the entered
