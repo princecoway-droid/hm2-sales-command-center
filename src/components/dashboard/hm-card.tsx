@@ -3,12 +3,9 @@ import Link from "next/link";
 import { TargetProgress } from "@/components/dashboard/target-progress";
 import { HmAvatar } from "@/components/hm/hm-avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  STATUS_DOT_CLASSES,
-  STATUS_LABELS,
-} from "@/components/ui/status-styles";
+import { KpiStatusBadge } from "@/components/ui/kpi-status";
 import { cn } from "@/lib/utils";
-import type { HmCardModel } from "@/lib/view-models/dashboard";
+import type { HmCardModel, KpiStatusModel } from "@/lib/view-models/dashboard";
 
 type HmCardProps = {
   hm: HmCardModel;
@@ -98,20 +95,41 @@ export function HmCard({ hm }: HmCardProps) {
         </span>
       </header>
 
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-        <Figure label="Net" value={hm.netLabel} emphasis />
-        <Figure label="Key-In" value={hm.keyInLabel} />
+      {/* The four KPIs the business set thresholds for, each with its own band
+          under it. Four separate answers, deliberately - "Key-In fine,
+          recruitment red" is something a manager can act on this afternoon,
+          where a single combined score for the card would say only that
+          something, somewhere, is off. */}
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3.5">
+        <Figure
+          label="Net"
+          value={hm.netLabel}
+          emphasis
+          kpiStatus={hm.statuses.net}
+          showNote
+        />
+        {/* The figure is the month's Key-In so far; the band under it is the
+            CURRENT week against the monthly target, and its note says so - "W2:
+            27 of 100 target · 27.0%". Without that line the badge would look
+            like it described the number above it. */}
+        <Figure
+          label="Key-In"
+          value={hm.keyInLabel}
+          kpiStatus={hm.statuses.keyIn}
+          showNote
+        />
 
         <Figure
           label="Recruitment"
           value={hm.recruitmentLabel}
-          status={hm.recruitmentStatus}
+          kpiStatus={hm.statuses.recruitment}
         />
         <Figure
           label="Active HP"
           value={hm.activeHpLabel}
           href={hm.activeHpHref}
           hrefLabel={`Active HP for ${hm.name} - open the HP list`}
+          kpiStatus={hm.statuses.activeHp}
         />
       </dl>
 
@@ -143,8 +161,6 @@ type FigureProps = {
   label: string;
   value: string;
   emphasis?: boolean;
-  /** Rendered as a dot AND a word, never as colour alone. */
-  status?: keyof typeof STATUS_DOT_CLASSES;
   /**
    * Makes the figure itself a link.
    *
@@ -153,15 +169,20 @@ type FigureProps = {
    */
   href?: string | null;
   hrefLabel?: string;
+  /** The Stage 9 band, rendered as a dot AND a word, never as colour alone. */
+  kpiStatus?: KpiStatusModel;
+  /** Whether to print what the band was measured against under it. */
+  showNote?: boolean;
 };
 
 function Figure({
   label,
   value,
   emphasis,
-  status,
   href,
   hrefLabel,
+  kpiStatus,
+  showNote = false,
 }: FigureProps) {
   return (
     <div className="min-w-0">
@@ -170,7 +191,7 @@ function Figure({
       </dt>
       <dd
         className={cn(
-          "mt-0.5 flex items-center gap-1.5 font-semibold tabular-nums text-slate-900",
+          "mt-0.5 font-semibold tabular-nums text-slate-900",
           emphasis ? "text-2xl leading-none" : "text-lg leading-none",
         )}
       >
@@ -185,16 +206,18 @@ function Figure({
         ) : (
           value
         )}
-        {status && status !== "neutral" ? (
-          <>
-            <span
-              aria-hidden
-              className={cn("size-2 rounded-full", STATUS_DOT_CLASSES[status])}
-            />
-            <span className="sr-only">{STATUS_LABELS[status]}</span>
-          </>
-        ) : null}
       </dd>
+
+      {/* Under the figure rather than beside it. At 375px a card column is
+          about 150px wide, and a band on the same line as a 24px number would
+          push one of the two off the card. */}
+      {kpiStatus ? (
+        <KpiStatusBadge
+          status={kpiStatus}
+          showNote={showNote}
+          className="mt-1.5"
+        />
+      ) : null}
     </div>
   );
 }

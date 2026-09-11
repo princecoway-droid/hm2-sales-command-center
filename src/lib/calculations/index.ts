@@ -105,6 +105,38 @@ export {
   type WeeklyKeyInPerformance,
 } from "@/lib/calculations/hm";
 
+// KPI status - the Stage 9 pacing bands. Thresholds live here and nowhere else.
+export {
+  getActiveHpStatus,
+  getHmKpiStatuses,
+  getHmKpiStatusesForMonth,
+  getKeyInStatus,
+  getManagementAttention,
+  getNetStatus,
+  getRecruitmentStatus,
+  hasKeyInThreshold,
+  keyInAchievement,
+  keyInThresholdFor,
+  kpiStatusMap,
+  needsAttention,
+  resolveCurrentWeek,
+  ACTIVE_HP_THRESHOLD,
+  HM_KPI_KEYS,
+  KEYIN_WEEK_THRESHOLDS,
+  KPI_STATUSES,
+  NET_RATIO_THRESHOLD,
+  RECRUITMENT_THRESHOLD,
+  type CurrentWeekResolution,
+  type CurrentWeekSource,
+  type HmKpiKey,
+  type HmKpiStatuses,
+  type KeyInKpiStatus,
+  type KeyInWeekThreshold,
+  type KpiStatus,
+  type ManagementAttentionEntry,
+  type WeeklyKeyInKpiStatus,
+} from "@/lib/calculations/kpi-status";
+
 // The group model.
 export {
   calculateDataCompleteness,

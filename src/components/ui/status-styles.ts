@@ -1,3 +1,4 @@
+import type { KpiStatus } from "@/lib/calculations/kpi-status";
 import type { PerformanceStatus } from "@/lib/calculations/performance";
 
 /**
@@ -56,3 +57,45 @@ export const STATUS_LABELS: Record<PerformanceStatus, string> = {
   red: "Below",
   neutral: "Not entered",
 };
+
+// -----------------------------------------------------------------------------
+// KPI status (Stage 9)
+// -----------------------------------------------------------------------------
+
+/**
+ * The Stage 9 bands in colour.
+ *
+ * The same three hues the rest of the application already uses, so a red dot
+ * means the same thing wherever it appears - a manager should not have to learn
+ * two palettes.
+ *
+ * Colour is never the only channel: every badge that uses these also renders
+ * the band in words. A dot alone would be invisible to a colour-blind reader
+ * and silent to a screen reader, and these bands are the business's own
+ * thresholds rather than decoration.
+ */
+export const KPI_STATUS_DOT_CLASSES: Record<KpiStatus, string> = {
+  needs_attention: "bg-rose-500",
+  watch: "bg-amber-500",
+  on_track: "bg-emerald-500",
+};
+
+export const KPI_STATUS_TEXT_CLASSES: Record<KpiStatus, string> = {
+  needs_attention: "text-rose-700",
+  watch: "text-amber-700",
+  on_track: "text-emerald-700",
+};
+
+/** Tinted pill, for the places a band has to be findable rather than merely legible. */
+export const KPI_STATUS_PILL_CLASSES: Record<KpiStatus, string> = {
+  needs_attention: "bg-rose-50 text-rose-800 ring-rose-200",
+  watch: "bg-amber-50 text-amber-800 ring-amber-200",
+  on_track: "bg-emerald-50 text-emerald-800 ring-emerald-200",
+};
+
+/** The "no band" appearance. Not a fourth band - nothing has been stated. */
+export const KPI_STATUS_NONE_CLASSES = {
+  dot: "bg-slate-300",
+  text: "text-slate-400",
+  pill: "bg-slate-50 text-slate-500 ring-slate-200",
+} as const;

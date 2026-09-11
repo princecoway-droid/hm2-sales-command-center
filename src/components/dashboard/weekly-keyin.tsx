@@ -1,3 +1,4 @@
+import { KpiStatusBadge } from "@/components/ui/kpi-status";
 import {
   STATUS_BAR_CLASSES,
   STATUS_DOT_CLASSES,
@@ -127,6 +128,30 @@ function WeekColumn({ week }: { week: WeeklyBar }) {
         <span className="hidden sm:inline">{STATUS_LABELS[week.status]}</span>
       </span>
 
+      {/* The week's pacing band: the GROUP's Key-In for it against the GROUP's
+          monthly target, at that week's threshold. A different question from
+          the volume band above it - "was this a big week" against "is the month
+          on pace at this point" - so both are shown rather than one replacing
+          the other. The note is hidden on a phone, where five columns leave no
+          room for a sentence; the screen-reader line below carries it. */}
+      {/* A fixed minimum height, because the parent row aligns its columns by
+          their bottom edge: a two-line "Needs Attention" in one column and a
+          one-line "Watch" in the next would otherwise stagger the whole chart. */}
+      <span className="flex min-h-8 w-full flex-col items-center gap-0.5 sm:min-h-10">
+        {/* Ringed, so the two indicators in this column stay distinguishable on
+            a phone where neither carries its word: the plain dot above is the
+            week's volume band, this one is its pace against target. */}
+        <KpiStatusBadge
+          status={week.kpiStatus}
+          compactOnMobile
+          className="items-center text-center [&>span>span:first-child]:ring-1 [&>span>span:first-child]:ring-white [&>span>span:first-child]:ring-offset-1 [&>span>span:first-child]:ring-offset-slate-300"
+        />
+
+        <span className="hidden text-[10px] leading-tight text-slate-400 sm:block sm:text-center">
+          {week.kpiStatus.note}
+        </span>
+      </span>
+
       {/* The whole week in one sentence, for a screen reader and for the
           small screens where the range and the band label are hidden. */}
       <span className="sr-only">
@@ -134,6 +159,7 @@ function WeekColumn({ week }: { week: WeeklyBar }) {
         {week.isEntered
           ? `${week.unitsLabel} units, ${STATUS_LABELS[week.status]}, from ${week.hmsEntered} HM${week.hmsEntered === 1 ? "" : "s"}`
           : "not entered yet"}
+        {week.kpiStatus.note ? `. ${week.kpiStatus.label}: ${week.kpiStatus.note}` : ""}
       </span>
     </li>
   );
@@ -159,19 +185,32 @@ function Legend() {
   ];
 
   return (
-    <ul className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
-      {entries.map((entry) => (
-        <li key={entry.status} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className={cn(
-              "size-2 rounded-full",
-              STATUS_DOT_CLASSES[entry.status],
-            )}
-          />
-          {entry.text}
-        </li>
-      ))}
-    </ul>
+    <div className="mt-4 border-t border-slate-100 pt-3">
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <li className="font-medium text-slate-600">Weekly volume</li>
+        {entries.map((entry) => (
+          <li key={entry.status} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={cn(
+                "size-2 rounded-full",
+                STATUS_DOT_CLASSES[entry.status],
+              )}
+            />
+            {entry.text}
+          </li>
+        ))}
+      </ul>
+
+      {/* Said in words rather than as a second row of dots. The two bands use
+          the same three colours - deliberately, so red means one thing across
+          the application - and the only way to tell them apart is to say what
+          each is measuring. */}
+      <p className="mt-1.5 text-[11px] text-slate-500">
+        <span className="font-medium text-slate-600">Pacing</span> · each week&rsquo;s
+        Key-In as a share of the group&rsquo;s monthly target, at that
+        week&rsquo;s threshold. No threshold is defined for W5 or W6.
+      </p>
+    </div>
   );
 }

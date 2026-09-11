@@ -8,6 +8,7 @@ import {
 } from "@/components/dashboard/dashboard-states";
 import { GroupKpis } from "@/components/dashboard/group-kpis";
 import { HmPerformance } from "@/components/dashboard/hm-performance";
+import { ManagementAttention } from "@/components/dashboard/management-attention";
 import { MonthSwitcher } from "@/components/dashboard/month-switcher";
 import { PeriodSummary } from "@/components/dashboard/period-summary";
 import { WeeklyKeyIn } from "@/components/dashboard/weekly-keyin";
@@ -163,6 +164,15 @@ export default async function DashboardPage(props: PageProps<"/dashboard">) {
       ) : (
         <>
           <CompletenessBanner completeness={dashboard.completeness} />
+
+          {/* Above the figures on purpose: the question a manager opens this
+              page with is "is anything wrong", and the answer should not be
+              three scrolls down on a phone. */}
+          <ManagementAttention
+            attention={dashboard.managementAttention}
+            monthLabel={dashboard.month.label}
+            currentWeekLabel={dashboard.currentWeekLabel}
+          />
 
           <GroupKpis
             kpis={dashboard.kpis}

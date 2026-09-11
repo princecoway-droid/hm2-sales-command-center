@@ -9,14 +9,20 @@ import {
   calculatePreviousMonthComparison,
   calculateQtdPerformance,
   findRank,
+  getHmKpiStatuses,
+  getManagementAttention,
   previousYearMonth,
+  resolveCurrentWeek,
   quarterMonthsToDate,
   sameYearMonth,
   toMonthInput,
   toSalesWeekInput,
+  type CurrentWeekResolution,
   type Entry,
   type GroupMonthlyCalculatedPerformance,
   type HMMonthlyCalculatedPerformance,
+  type HmKpiStatuses,
+  type ManagementAttentionEntry,
   type MetricMonthOverMonth,
   type MonthOverMonthComparison,
   type QtdMonthContribution,
@@ -28,6 +34,7 @@ import {
   type RankingOptions,
   type YearMonth,
 } from "@/lib/calculations";
+import { reportingDate } from "@/lib/calendar";
 import type { HM, Month, SalesWeek } from "@/types/models";
 
 /**
@@ -126,6 +133,30 @@ export type MonthlyPerformanceViewModel = {
   qtd: QtdPerformance;
   /** The same, per HM, keyed by `hmId`. */
   hmQtd: Record<string, QtdPerformance>;
+
+  /**
+   * The Coway week the month is at, resolved from the CONFIGURED periods.
+   *
+   * A property of the calendar rather than of any HM, so it is resolved once
+   * here and every Key-In status in the month is taken from the same week.
+   * `null` when the month has no sales weeks configured.
+   */
+  currentWeek: CurrentWeekResolution | null;
+  /**
+   * The four KPI statuses per HM, keyed by `hmId`.
+   *
+   * Calculated here, once, so the dashboard card, the HM's own screen and the
+   * Management Attention list are reading the SAME object - a status cannot
+   * differ between two surfaces any more than a Net figure can.
+   */
+  hmKpiStatuses: Record<string, HmKpiStatuses>;
+  /**
+   * The HMs with at least one NEEDS ATTENTION KPI, most reds first.
+   *
+   * In the month's ranking order within an equal count - `rankings` is what
+   * this is built from, so the tie-break is the dashboard's own order.
+   */
+  managementAttention: ManagementAttentionEntry[];
 };
 
 // -----------------------------------------------------------------------------
@@ -224,7 +255,17 @@ function compareHmMonths(
  */
 export function buildMonthlyPerformanceViewModel(
   bundle: PerformanceBundle,
-  options: { ranking?: RankingOptions } = {},
+  options: {
+    ranking?: RankingOptions;
+    /**
+     * Today, as `YYYY-MM-DD` in the reporting timezone.
+     *
+     * Only the Stage 9 current-week resolution uses it. Passed in so a test can
+     * stand in the middle of September without mocking a clock, and so a
+     * historical month resolves identically however long ago it was.
+     */
+    today?: string;
+  } = {},
 ): MonthlyPerformanceViewModel | null {
   const selectedRecords = bundle.months.find(
     (entry) => entry.month.id === bundle.selectedMonthId,
@@ -349,14 +390,44 @@ export function buildMonthlyPerformanceViewModel(
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // KPI status (Stage 9)
+  // ---------------------------------------------------------------------------
+
+  const rankings = calculateHmRankings(group.hms, options.ranking);
+
+  // One resolution for the whole month: the current week is a fact about the
+  // Coway calendar, not about a person, so every HM's Key-In status is banded
+  // against the same week.
+  const currentWeek = resolveCurrentWeek(
+    selectedRecords.weeks.map(toSalesWeekInput),
+    options.today ?? reportingDate(),
+  );
+
+  const hmKpiStatuses: Record<string, HmKpiStatuses> = {};
+
+  for (const hm of group.hms) {
+    hmKpiStatuses[hm.hmId] = getHmKpiStatuses(hm, currentWeek);
+  }
+
   return {
     group,
-    rankings: calculateHmRankings(group.hms, options.ranking),
+    rankings,
     previousMonth,
     hmPreviousMonth,
     hmPreviousMonthRecruitment,
     qtd: calculateQtdPerformance(selected, groupContributions),
     hmQtd,
+    currentWeek,
+    hmKpiStatuses,
+    // Built from the RANKING rather than from `group.hms`, so the tie-break
+    // between two HMs with the same number of red KPIs is the order the
+    // dashboard already puts them in.
+    managementAttention: getManagementAttention(
+      rankings
+        .map((entry) => hmKpiStatuses[entry.performance.hmId])
+        .filter((entry): entry is HmKpiStatuses => entry !== undefined),
+    ),
   };
 }
 
@@ -385,6 +456,16 @@ export type HmPerformanceViewModel = {
   previousMonthRecruitment: MetricMonthOverMonth;
   qtd: QtdPerformance;
   /**
+   * The four KPI statuses, and the weekly bands behind the Key-In one.
+   *
+   * The SAME object the dashboard card reads for an HM the month covers - taken
+   * from the month model rather than recomputed, so the two screens cannot
+   * disagree about whether somebody needs attention.
+   */
+  kpiStatuses: HmKpiStatuses;
+  /** The Coway week the Key-In status is taken from. See the month model. */
+  currentWeek: CurrentWeekResolution | null;
+  /**
    * False when this month's figures are not about this HM at all: they are
    * inactive today and have nothing recorded for the month, so `selectHmsForMonth`
    * leaves them out of the group totals.
@@ -406,6 +487,7 @@ export type HmPerformanceViewModel = {
 export function buildHmPerformanceViewModel(
   bundle: PerformanceBundle,
   hmId: string,
+  options: { today?: string } = {},
 ): HmPerformanceViewModel | null {
   const hm = bundle.hms.find((entry) => entry.id === hmId);
 
@@ -421,7 +503,9 @@ export function buildHmPerformanceViewModel(
     return null;
   }
 
-  const monthModel = buildMonthlyPerformanceViewModel(bundle);
+  const monthModel = buildMonthlyPerformanceViewModel(bundle, {
+    today: options.today,
+  });
 
   if (!monthModel) {
     return null;
@@ -442,6 +526,9 @@ export function buildHmPerformanceViewModel(
       previousMonthNet: monthModel.hmPreviousMonth[hmId]!,
       previousMonthRecruitment: monthModel.hmPreviousMonthRecruitment[hmId]!,
       qtd: monthModel.hmQtd[hmId]!,
+      // The dashboard's own status object, not a second calculation of it.
+      kpiStatuses: monthModel.hmKpiStatuses[hmId]!,
+      currentWeek: monthModel.currentWeek,
       isCoveredByMonth: true,
     };
   }
@@ -507,6 +594,11 @@ export function buildHmPerformanceViewModel(
     previousMonthNet: compared.net,
     previousMonthRecruitment: compared.recruitment,
     qtd: calculateQtdPerformance(selected, contributions),
+    // The same banding function, against the same week the month resolved to.
+    // Everything is blank for this HM, so every status comes back `null` - not
+    // a red, which would report a bad month for somebody who was not there.
+    kpiStatuses: getHmKpiStatuses(performance, monthModel.currentWeek),
+    currentWeek: monthModel.currentWeek,
     isCoveredByMonth: false,
   };
 }

@@ -1,3 +1,4 @@
+import { KpiStatusBadge } from "@/components/ui/kpi-status";
 import {
   STATUS_BAR_CLASSES,
   STATUS_DOT_CLASSES,
@@ -128,6 +129,22 @@ function WeekRow({ week }: { week: HmWeeklyBarModel }) {
         {week.unitsLabel}
       </span>
 
+      {/* The week's pacing band: its Key-In as a share of this HM's MONTHLY
+          target, at that week's threshold. Progress against the month, week by
+          week - not a weekly target, which the business does not set, and not
+          an incentive figure. Full width on its own line so "Needs Attention"
+          and the arithmetic behind it both fit at 375px. */}
+      {week.kpiStatus ? (
+        <span className="col-span-full flex flex-wrap items-center gap-x-2 gap-y-0.5 sm:col-start-3 sm:col-end-5 sm:row-start-2 sm:justify-end">
+          <KpiStatusBadge status={week.kpiStatus} />
+          {week.kpiStatus.note ? (
+            <span className="text-[10px] leading-tight text-slate-400">
+              {week.kpiStatus.note}
+            </span>
+          ) : null}
+        </span>
+      ) : null}
+
       {/* The whole week in one sentence, for a screen reader and for anyone
           reading the band rather than the colour. */}
       <span className="sr-only">
@@ -135,6 +152,9 @@ function WeekRow({ week }: { week: HmWeeklyBarModel }) {
         {week.isEntered
           ? `${week.unitsLabel} units, ${week.statusLabel}`
           : "not entered yet, NEUTRAL"}
+        {week.kpiStatus?.note
+          ? `. Pacing ${week.kpiStatus.label}: ${week.kpiStatus.note}`
+          : ""}
       </span>
     </li>
   );
@@ -160,16 +180,28 @@ function Legend() {
   ];
 
   return (
-    <ul className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
-      {entries.map((entry) => (
-        <li key={entry.status} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className={cn("size-2 rounded-full", STATUS_DOT_CLASSES[entry.status])}
-          />
-          {entry.text}
-        </li>
-      ))}
-    </ul>
+    <div className="mt-4 border-t border-slate-100 pt-3">
+      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+        <li className="font-medium text-slate-600">Weekly volume</li>
+        {entries.map((entry) => (
+          <li key={entry.status} className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className={cn("size-2 rounded-full", STATUS_DOT_CLASSES[entry.status])}
+            />
+            {entry.text}
+          </li>
+        ))}
+      </ul>
+
+      {/* Both bands use the same three colours - on purpose, so red means one
+          thing everywhere - which is exactly why each has to say what it
+          measures. */}
+      <p className="mt-1.5 text-[11px] text-slate-500">
+        <span className="font-medium text-slate-600">Pacing</span> · each
+        week&rsquo;s Key-In as a share of this HM&rsquo;s monthly target, at that
+        week&rsquo;s threshold. No threshold is defined for W5 or W6.
+      </p>
+    </div>
   );
 }

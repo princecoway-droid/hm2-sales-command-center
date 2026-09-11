@@ -327,6 +327,27 @@ export function toIsoDate(date: Date): string {
 export const REPORTING_TIME_ZONE = "Asia/Kuala_Lumpur";
 
 /**
+ * Today, as the reporting office would write it: `2026-09-08`.
+ *
+ * The one conversion from a clock to a date the engine can compare against a
+ * Coway period. It matters at both ends of a day: a server running in UTC is
+ * eight hours behind Kuala Lumpur, so a page rendered at 07:00 on the 6th would
+ * otherwise resolve the current week as though it were still the 5th - the last
+ * day of W1 - and show the wrong week's Key-In status all morning.
+ *
+ * `en-CA` is used only because it formats as `YYYY-MM-DD`; the timezone is the
+ * point of the call.
+ */
+export function reportingDate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: REPORTING_TIME_ZONE,
+  }).format(date);
+}
+
+/**
  * An audit timestamp as the office reads it: "4 Sep 2026, 14:32".
  *
  * Formatted on the server and sent as text, so the browser never has to agree

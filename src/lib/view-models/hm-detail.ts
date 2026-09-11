@@ -4,16 +4,21 @@ import {
   type Entry,
   type HMMonthlyCalculatedPerformance,
   type PerformanceStatus,
+  type WeeklyKeyInKpiStatus,
 } from "@/lib/calculations";
 import { formatUpdatedAt, formatWeekRange, monthLabel, monthParam } from "@/lib/calendar";
 import { dashboardPath } from "@/lib/routes";
 import {
+  buildHmKpiStatusModels,
+  buildKeyInStatusModel,
   buildMonthOverMonthModel,
   buildQtdModel,
   progressWidth,
   quarterLabel,
   NO_VALUE,
   type DashboardNotice,
+  type HmKpiStatusModels,
+  type KpiStatusModel,
   type MonthOverMonthModel,
   type QtdModel,
   type TargetProgressModel,
@@ -74,6 +79,16 @@ export type HmMetricModel = {
    * destination is behind a login.
    */
   href?: string | null;
+  /**
+   * The Stage 9 pacing band, for the four KPIs that have one.
+   *
+   * Separate from `status` above, which is the older Stage 2 colour band. The
+   * two answer different questions with different thresholds - recruitment of 3
+   * is GREEN under the old band and Watch under the new one - so they are kept
+   * apart rather than reconciled, and a component renders one or the other, not
+   * both. `null` on the public share view, which Stage 9 does not extend.
+   */
+  kpiStatus?: KpiStatusModel | null;
 };
 
 /** One Coway period on the HM's weekly strip. */
@@ -89,6 +104,15 @@ export type HmWeeklyBarModel = {
   isEntered: boolean;
   /** Length of the bar as a share of this HM's tallest entered week, 0-100. */
   barPct: number;
+  /**
+   * The Stage 9 band for this week: its Key-In as a share of the HM's MONTHLY
+   * target, against that week's threshold.
+   *
+   * Progress against the monthly target at each week - not a weekly target, and
+   * not a weekly incentive. `null` status for W5/W6, an unentered week, or a
+   * month with no target set. `null` on the public share view.
+   */
+  kpiStatus?: KpiStatusModel | null;
 };
 
 export type HmWeeklyModel = {
@@ -184,6 +208,18 @@ export type HmDetailViewModel = {
   // Secondary
   secondary: HmMetricModel[];
 
+  /**
+   * The four Stage 9 bands, as one object.
+   *
+   * The metrics above carry the same models on the tiles that show them; this
+   * is the same set gathered together, so a caller that wants the statuses
+   * without reading four tiles has them, and every one of them is the
+   * dashboard's - not a second calculation. `null` on the public view.
+   */
+  kpiStatuses: HmKpiStatusModels | null;
+  /** "W2", the week the Key-In band was taken from, or `null`. */
+  currentWeekLabel: string | null;
+
   weekly: HmWeeklyModel;
   salesMix: HmSalesMixModel;
   previousMonthNet: MonthOverMonthModel;
@@ -228,7 +264,11 @@ export function statusWord(status: PerformanceStatus): string {
 // Sections
 // -----------------------------------------------------------------------------
 
-function buildWeekly(hm: HMMonthlyCalculatedPerformance): HmWeeklyModel {
+function buildWeekly(
+  hm: HMMonthlyCalculatedPerformance,
+  /** The Stage 9 bands, by week id. Empty on the public view, which has none. */
+  kpiByWeekId: ReadonlyMap<string, WeeklyKeyInKpiStatus>,
+): HmWeeklyModel {
   const weeks = hm.weeklyPerformance;
 
   // The tallest ENTERED week sets the scale. A blank week has no height to
@@ -244,22 +284,40 @@ function buildWeekly(hm: HMMonthlyCalculatedPerformance): HmWeeklyModel {
   const weeksEntered = hm.presence.weeksEntered;
 
   return {
-    weeks: weeks.map((week) => ({
-      weekId: week.weekId,
-      label: week.weekLabel,
-      rangeLabel: formatWeekRange({
-        start_date: week.startDate,
-        end_date: week.endDate,
-      }),
-      unitsLabel: unitsLabel(week.keyInUnits),
-      status: week.status,
-      statusLabel: statusWord(week.status),
-      isEntered: week.isEntered,
-      barPct:
-        week.isEntered && week.keyInUnits !== null && tallest > 0
-          ? (week.keyInUnits / tallest) * 100
-          : 0,
-    })),
+    weeks: weeks.map((week) => {
+      const banded = kpiByWeekId.get(week.weekId);
+
+      return {
+        weekId: week.weekId,
+        label: week.weekLabel,
+        rangeLabel: formatWeekRange({
+          start_date: week.startDate,
+          end_date: week.endDate,
+        }),
+        unitsLabel: unitsLabel(week.keyInUnits),
+        status: week.status,
+        statusLabel: statusWord(week.status),
+        isEntered: week.isEntered,
+        barPct:
+          week.isEntered && week.keyInUnits !== null && tallest > 0
+            ? (week.keyInUnits / tallest) * 100
+            : 0,
+        kpiStatus: banded
+          ? buildKeyInStatusModel({
+              status: banded.status,
+              weekId: banded.weekId,
+              weekNumber: banded.weekNumber,
+              weekLabel: banded.weekLabel,
+              weekSource: null,
+              keyInUnits: banded.keyInUnits,
+              targetUnits: hm.targetNetUnits,
+              achievementPct: banded.achievementPct,
+              hasThreshold: banded.hasThreshold,
+              isEntered: banded.isEntered,
+            })
+          : null,
+      };
+    }),
     hasWeeks: weeks.length > 0,
     hasEntries: weeksEntered > 0,
     weeksEntered,
@@ -324,6 +382,7 @@ function buildSalesMix(hm: HMMonthlyCalculatedPerformance): HmSalesMixModel {
 function buildSecondary(
   hm: HMMonthlyCalculatedPerformance,
   hpListingHref: string | null,
+  kpiStatuses: HmKpiStatusModels | null,
 ): HmMetricModel[] {
   const recruitment = unitsLabel(hm.recruitment);
 
@@ -338,12 +397,14 @@ function buildSecondary(
       // 1-2 yellow, 0 red. Applied by the engine, read here.
       status: hm.recruitmentStatus,
       statusLabel: statusWord(hm.recruitmentStatus),
+      kpiStatus: kpiStatuses?.recruitment ?? null,
     },
     {
       key: "activeHp",
       label: "Active HP",
       value: unitsLabel(hm.activeHp),
       unit: null,
+      kpiStatus: kpiStatuses?.activeHp ?? null,
       // COUNTED from the imported HP rows since Stage 8: this HM's HPs whose
       // Total Key-In for the month is at least 1. Blank rather than 0 when no
       // HP file has been imported for them.
@@ -431,6 +492,25 @@ export function buildHmDetailViewModel({
   const hasTarget = hm.targetNetUnits !== null && hm.targetNetUnits > 0;
   const keyIn = hm.presence.weeksEntered > 0 ? formatUnits(hm.totalKeyIn) : NO_VALUE;
 
+  // Stage 9 is a management view, and the shared report is not being extended
+  // by it: a public viewer sees the same figures they have always seen, with no
+  // bands attached. Decided here rather than in the components, so no future
+  // card can start rendering one by accident.
+  const showKpiStatus = audience !== "public";
+
+  const kpiStatuses: HmKpiStatusModels | null = showKpiStatus
+    ? buildHmKpiStatusModels(model.kpiStatuses, hm.netRatioPct)
+    : null;
+
+  const weeklyKpiByWeekId: ReadonlyMap<string, WeeklyKeyInKpiStatus> =
+    showKpiStatus
+      ? new Map(
+          model.kpiStatuses.weekly.map(
+            (week) => [week.weekId, week] as const,
+          ),
+        )
+      : new Map();
+
   return {
     hm: {
       id: hm.hmId,
@@ -470,6 +550,10 @@ export function buildHmDetailViewModel({
       note: hm.netUnits === null ? "Not entered" : null,
       status: null,
       statusLabel: null,
+      // The band sits on Net rather than on the ratio tile below, so this
+      // screen and the dashboard card put it in the same place. Its note - "x%
+      // of Key-In" - is what the threshold was applied to.
+      kpiStatus: kpiStatuses?.net ?? null,
     },
     target: {
       key: "target",
@@ -501,6 +585,10 @@ export function buildHmDetailViewModel({
       note: hm.presence.weeksEntered > 0 ? "Sum of entered weeks" : "No weeks entered",
       status: null,
       statusLabel: null,
+      // The band is the CURRENT week's Key-In against the monthly target, while
+      // the figure above it is the month so far. The band's own note names the
+      // week and the arithmetic, so the two cannot be read as the same number.
+      kpiStatus: kpiStatuses?.keyIn ?? null,
     },
     netRatio: {
       key: "netRatio",
@@ -510,6 +598,10 @@ export function buildHmDetailViewModel({
       note: hm.netRatioPct === null ? "Needs Key-In" : "Net vs Key-In",
       status: null,
       statusLabel: null,
+      // No band here: this figure IS the Net band's denominator, and the band
+      // is shown once, on Net above. Two copies of one verdict on one screen
+      // read as two verdicts.
+      kpiStatus: null,
     },
 
     targetProgress: {
@@ -522,8 +614,12 @@ export function buildHmDetailViewModel({
       hasTarget,
     },
 
-    secondary: buildSecondary(hm, hpListingHref),
-    weekly: buildWeekly(hm),
+    secondary: buildSecondary(hm, hpListingHref, kpiStatuses),
+    kpiStatuses,
+    currentWeekLabel: showKpiStatus
+      ? (model.currentWeek?.week.weekLabel ?? null)
+      : null,
+    weekly: buildWeekly(hm, weeklyKpiByWeekId),
     salesMix: buildSalesMix(hm),
     previousMonthNet: buildMonthOverMonthModel(model.previousMonthNet),
     previousMonthRecruitment: buildMonthOverMonthModel(

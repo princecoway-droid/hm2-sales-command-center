@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { KpiStatusBadge } from "@/components/ui/kpi-status";
 import {
   STATUS_DOT_CLASSES,
   STATUS_TEXT_CLASSES,
@@ -41,7 +42,16 @@ const VALUE_SIZES = {
  * - rather than a bare number.
  */
 export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
-  const showStatus = metric.status !== null && metric.status !== "neutral";
+  const kpiStatus = metric.kpiStatus ?? null;
+
+  // Only one band per tile. Recruitment carries both - the Stage 2 colour band
+  // and the Stage 9 pacing band - and they disagree by design: 3 recruits is
+  // GREEN under the old thresholds and Watch under the new ones. Showing both
+  // would put two contradictory verdicts on one figure, so the Stage 9 band
+  // wins wherever it exists, and the older one still drives the data-entry
+  // grid, the WhatsApp report and the shared report untouched.
+  const showStatus =
+    kpiStatus === null && metric.status !== null && metric.status !== "neutral";
 
   const body = (
     <>
@@ -62,6 +72,14 @@ export function HmMetric({ metric, emphasis = "normal" }: HmMetricProps) {
           </span>
         ) : null}
       </p>
+
+      {/* The Stage 9 band, with the arithmetic behind it. On Key-In that line
+          is doing real work: the figure above is the month's total, while the
+          band is the CURRENT week against the monthly target - two different
+          numbers, and the note is what keeps them from being read as one. */}
+      {kpiStatus ? (
+        <KpiStatusBadge status={kpiStatus} showNote className="mt-2" />
+      ) : null}
 
       {/* Wraps rather than truncates. At 375px "Sum of entered weeks" and
           "GREEN · New this month" both run past the tile, and a note clipped to

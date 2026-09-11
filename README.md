@@ -173,6 +173,7 @@ npm run dev
 | `npm run test:stage5` | HM detail: one HM's month, and that it matches the dashboard |
 | `npm run test:stage6` | WhatsApp report, share tokens, the public projection |
 | `npm run test:stage8` | HP Excel import, Active HP, the HP listing, and the import against a real Postgres |
+| `npm run test:stage9` | KPI status thresholds, the current-week resolution, and Management Attention |
 | `npm run db:test` | Schema, constraint, trigger and RLS tests (no Docker) |
 | `npm test` | Every suite |
 | `npm run check` | typecheck → lint → tests → build |
@@ -343,6 +344,75 @@ Balance column has always shown; `splitBalance()` is its negation and carries
 the reporting sign convention above. Changing the sign of the first would flip a
 colour on a screen that already works. Neither is a rule: no save, anywhere,
 depends on either value.
+
+### KPI status: a pacing indicator, not a forecast
+
+`src/lib/calculations/kpi-status.ts` bands four already-calculated figures
+against thresholds the business supplied. It answers *"at this point in the
+month, is this figure healthy?"* and nothing else — there is no forecast, no
+probability, no incentive projection, and deliberately **no combined score**.
+
+Three bands, and only three:
+
+| Status | Shown as |
+|---|---|
+| `needs_attention` | 🔴 Needs Attention |
+| `watch` | 🟡 Watch |
+| `on_track` | 🟢 On Track |
+
+**Key-In**, per week, as a share of the HM's **monthly** target — never a weekly
+target, which the business does not set:
+
+| Week | Needs Attention | Watch | On Track |
+|---|---|---|---|
+| W1 | `<= 15%` | `> 15%` and `<= 25%` | `> 25%` |
+| W2 | `< 30%` | `>= 30%` and `< 50%` | `>= 50%` |
+| W3 | `< 45%` | `>= 45%` and `< 75%` | `>= 75%` |
+| W4 | `< 60%` | `>= 60%` and `< 100%` | `>= 100%` |
+| W5, W6 | — | — | — |
+
+W1 is the one week stated with **strict** comparisons: 15% is red and 25% is
+amber. W5 and W6 have **no defined threshold** and get none — the figures stay
+visible and the status reads "Not configured".
+
+| Metric | Needs Attention | Watch | On Track |
+|---|---|---|---|
+| **Recruitment** | `0–2` | `3–4` | `>= 5` |
+| **Net ratio** (`Net / Total Key-In`) | `< 50%` | `>= 50%` and `< 75%` | `>= 75%` |
+| **Active HP** (Stage 8 HP-derived) | `< 10` | `10–20` | `> 20` |
+
+Active HP is the only band whose upper edge is exclusive: 20 is Watch, 21 is On
+Track. The recruitment bands here are **not** the Stage 2 colour bands
+(`recruitmentStatus`, `>= 3` green) that the data-entry grid, the WhatsApp
+report and the shared report still use — two different questions, two different
+sets of numbers, kept apart rather than reconciled.
+
+A status of `null` is *not* a fourth band. It means no band can be stated, for
+one of three honest reasons: the figure has not been keyed in, the denominator
+is missing or zero, or the week has no defined threshold. None is rendered as a
+red. The only exception is the business's own instruction for Net: an HM with
+Net entered and **nothing keyed in** has an undefined ratio and is reported as
+Needs Attention, with the ratio itself still shown as `—`.
+
+**The current week** comes from `resolveCurrentWeek(weeks, today)`, which reads
+the configured `sales_weeks` rows and never does calendar arithmetic — Coway
+weeks are not calendar weeks, and September's W1 routinely opens in August.
+Today inside a period is that week; past every period (any historical month) is
+the last one that ended; before them all is W1. `today` is an ISO date in
+`Asia/Kuala_Lumpur`, produced by `reportingDate()` and passed in, so the engine
+keeps its no-clock rule and a test can stand in the middle of any month.
+
+Statuses are calculated once per month in
+`buildMonthlyPerformanceViewModel` and read from there by the dashboard card,
+the HM screen and the Management Attention list — the same object, so the three
+cannot disagree. **Management Attention** lists only HMs with at least one
+`needs_attention` KPI, most reds first with the month's ranking as the
+tie-break, and names the affected KPIs and nothing more. Nothing is stored: the
+bands are derived at render time from data already loaded, and no query was
+added for them.
+
+The shared report is **not** extended by any of this. A token holder sees the
+same figures they always saw, with no bands attached.
 
 ### Group SHI is read, never derived
 
@@ -810,6 +880,7 @@ src/
       inputs.ts          normalization: database rows -> calculation inputs
       hm.ts              the HM monthly model + the weekly model
       group.ts           group aggregation + data completeness
+      kpi-status.ts      the KPI pacing bands + the current Coway week
       comparison.ts      quarter/month arithmetic, MoM, QTD
       ranking.ts         ordering, with a total tie-break rule
       index.ts           the barrel — import derived figures from here
@@ -887,8 +958,28 @@ tests/
 
 ## The dashboard
 
-`/dashboard?month=2026-09` — the management command centre. Group KPIs, the
-weekly Key-In chart, and the HM cards ranked by net units.
+`/dashboard?month=2026-09` — the management command centre. Management
+Attention, group KPIs, the weekly Key-In chart, and the HM cards ranked by net
+units.
+
+### Management Attention
+
+The first section on the page, because the question a manager opens the
+dashboard with is "is anything wrong" and the answer should not be three scrolls
+down on a phone. It names every HM with at least one 🔴 KPI and which KPIs those
+are — most reds first, the month's ranking as the tie-break. Watch never appears
+there: a list holding both bands would name most of the team most months.
+
+Empty is the good case and reads like one: *"All HM KPIs are above the attention
+threshold."*
+
+Each HM card then carries the four bands under the four figures — Key-In, Net,
+Recruitment and Active HP — with the arithmetic spelled out where the band and
+the figure are different numbers. The card's Key-In figure is the month's total;
+the band under it is the **current week** against the monthly target, and its
+note says so: `W2: 27 of 100 target · 27.0%`. The thresholds are in
+[the calculation engine](#kpi-status-a-pacing-indicator-not-a-forecast); no
+component holds one.
 
 ### The presenter, and why components hold no formulas
 
@@ -979,13 +1070,29 @@ about 50px each — enough for a bar and nothing for "30 Aug – 5 Sep". Turned 
 its side every week gets the full width for its dates and its figure, and one
 layout serves a phone and a 1440px desktop.
 
+### The same four bands as the card
+
+Key-In, Net, Recruitment and Active HP each carry the KPI status the dashboard
+card shows, read out of the same month model rather than recalculated. The
+weekly strip adds one per week: that week's Key-In as a share of this HM's
+monthly target, at that week's threshold — progress against the month, week by
+week. A week the PA has not reached says "Not entered"; W5 and W6 say "Not
+configured", because the business has defined no band for them.
+
+Where a figure carries both an old Stage 2 colour band and a Stage 9 pacing
+band — Recruitment is the only one — the tile shows the pacing band alone. The
+two disagree by design (3 recruits is GREEN under the old thresholds and Watch
+under the new), and two verdicts on one number is worse than either.
+
 ### What it refuses to invent
 
 No achievement bands: the business has not defined any, so the target track is
 one neutral colour and the figure is written out beside it. A target of 0 reads
-"Target not set" with a blank achievement, never 0% or ∞%. A missing SHI says
-"Not entered" rather than borrowing the group's or last month's. An HM the
-month does not cover still opens — they exist — and says nothing was entered.
+"Target not set" with a blank achievement, never 0% or ∞% — and no Key-In band
+either, because a pace with no target is unknown rather than 0%. A missing SHI
+says "Not entered" rather than borrowing the group's or last month's. An HM the
+month does not cover still opens — they exist — and says nothing was entered,
+with no band anywhere on the page.
 
 ---
 
@@ -1220,9 +1327,11 @@ image export, scheduled sending and any WhatsApp API integration.
 
 Deliberately **not** built, and not an oversight: there is no weekly incentive
 calculator, target engine, threshold, forecast or status badge anywhere in the
-HP data. W1–W4 exist because the PA's spreadsheet already carries them and
-because an HM can read momentum off them — they are performance detail, not an
-input to a calculation the business has not defined.
+**HP** data. W1–W4 exist there because the PA's spreadsheet already carries them
+and because an HM can read momentum off them — they are performance detail, not
+an input to a calculation the business has not defined. The Stage 9 KPI bands
+are HM-level and stop at the thresholds the business stated; they do not reach
+down to an individual HP, and they forecast nothing.
 
 Each of those consumes `buildMonthlyPerformanceViewModel()` or
 `buildHmPerformanceViewModel()` and formats what it returns. None of them
