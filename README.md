@@ -753,8 +753,9 @@ photo already stored.
 
 ## Deploying
 
-A stock Next.js App Router deployment. Nothing here is host-specific, and
-nothing is configured that a host has to be told about.
+A stock Next.js App Router deployment. The one host-specific thing is the
+region, and it matters more than it looks — see [Run the server next to the
+database](#run-the-server-next-to-the-database).
 
 | | |
 |---|---|
@@ -768,6 +769,36 @@ Every route except `/` and `/_not-found` is server-rendered on demand, which is
 the point rather than an oversight: they all read the signed-in user's session,
 and `/share/[token]` is `force-dynamic` so a revoked link stops working
 immediately rather than eventually.
+
+### Run the server next to the database
+
+`vercel.json` pins the functions to **`sin1` (Singapore)**:
+
+```json
+{ "regions": ["sin1"] }
+```
+
+This is not a preference. Every page here is server-rendered and talks to
+Supabase several times before it can render: the proxy revalidates the JWT, the
+page guard loads the profile, then the dashboard bundle goes out in two
+dependent waves. Those round trips are *sequential* — each one needs the answer
+to the last — so the page costs about six times the latency between the server
+and the database, whatever the queries themselves cost.
+
+The Supabase project is in South East Asia. Left on Vercel's default the
+functions were running in `iad1` (Washington DC), which put roughly 250 ms of
+Pacific between the server and its database on every one of those round trips —
+a page that should be a few hundred milliseconds took three to four seconds, and
+a cold start made it far worse. In `sin1` the same round trip is about 10 ms.
+
+So: **the functions must run in the same region as the Supabase project.** If
+the database is ever moved, move this with it. `x-vercel-id` on any response
+names the region that served it — `sin1::sin1::…` is right, `sin1::iad1::…`
+means the request entered in Singapore and was executed in Virginia.
+
+Note that `preferredRegion` — the Next.js route-segment export — is **deprecated
+in Next 16** and must not be used for this; the host config above is the
+supported route.
 
 **Environment variables in production.** Exactly three, all documented under
 [Configure environment](#2-configure-environment):

@@ -1420,8 +1420,17 @@ report(
 
 // --- a token reaches its own month and no other -------------------------------
 report(
+  // On the PARSED rows, never on a substring of the serialized payload: "999"
+  // is three hex digits, so it also matches a uuid, and it matches the
+  // fractional seconds of a timestamp ending `.999`. Both have made this
+  // assertion fail against perfectly correct data.
   "April's figure does not appear in March's report",
-  !serialised.includes("999"),
+  resolved?.month?.label === "March 2027" &&
+    (resolved.monthly ?? []).every(
+      (row) =>
+        Number(row.net_units) !== 999 && Number(row.target_net_units) !== 999,
+    ),
+  serialised.slice(0, 200),
 );
 
 await asSuperuser(
@@ -1438,8 +1447,11 @@ const april = (
 report(
   "April's own token returns April, not March",
   april?.month?.label === "April 2027" &&
-    !JSON.stringify(april).includes('"net_units": 42') &&
-    Number(april.monthly[0].net_units) === 999,
+    Number(april.monthly[0].net_units) === 999 &&
+    // March's own figure, checked as a NUMBER rather than as `"net_units": 42`
+    // in the serialized text - that depended on the exact key spacing the JSON
+    // serializer happened to use.
+    (april.monthly ?? []).every((row) => Number(row.net_units) !== 42),
   JSON.stringify(april?.month),
 );
 
@@ -1688,8 +1700,18 @@ const hmContext = JSON.stringify(hmResolved?.context);
 report(
   "a context month carries ONLY the requested HM's rows",
   hmResolved.context.every((entry) =>
-    (entry.monthly ?? []).every((row) => row.hm_id === shareHm.id),
-  ) && !hmContext.includes("777"),
+    // `hm_id` is the guarantee; the other HM's sentinel 777 is the sanity
+    // check that it is the RIGHT rows rather than merely a consistent set.
+    //
+    // Asserted on the parsed rows, never on a substring of the serialized
+    // payload: `includes("777")` also matches a uuid, and on 2026-09-11 it
+    // duly failed against a month whose id was `bb0a4f52-…-27a777ad9f5d`
+    // while the data underneath was perfectly correct.
+    [...(entry.monthly ?? []), ...(entry.hp_active ?? [])].every(
+      (row) => row.hm_id === shareHm.id,
+    ) &&
+    (entry.monthly ?? []).every((row) => Number(row.net_units) !== 777),
+  ),
   hmContext?.slice(0, 200),
 );
 
@@ -1711,7 +1733,14 @@ report(
 
 report(
   "a LATER month is never in the context - there is no April in a March report",
-  !hmContext.includes(shareMonthB.id) && !hmContext.includes("999"),
+  hmResolved.context.every(
+    (entry) =>
+      // Ids compared as ids, and the sentinel as a number. See the note on the
+      // "ONLY the requested HM's rows" assertion above.
+      entry.month?.id !== shareMonthB.id &&
+      (entry.monthly ?? []).every((row) => Number(row.net_units) !== 999),
+  ),
+  hmContext?.slice(0, 200),
 );
 
 const hmSerialised = JSON.stringify(hmResolved);

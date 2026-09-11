@@ -19,6 +19,30 @@ import type { AuthenticatedUser, UserRole } from "@/types/models";
  */
 
 /**
+ * The authenticated Supabase user, or `null`. NOT the application user.
+ *
+ * Split out and `cache()`d because `getUser()` is a NETWORK CALL - it
+ * revalidates the JWT against the Auth server, which is the whole reason to
+ * prefer it over `getSession()`, which only decodes a cookie a client could
+ * have tampered with. Every guarded page needs the answer twice: once to tell
+ * "not signed in" from "signed in but not provisioned", and once to load the
+ * profile. Without this, that is two round trips to another continent for the
+ * same fact.
+ *
+ * `cache()` is per-request, so nothing is shared between users.
+ */
+const getAuthUser = cache(async () => {
+  const supabase = await createSupabaseServerClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  return error ? null : user;
+});
+
+/**
  * The signed-in user together with their application profile, or `null`.
  *
  * `cache()` dedupes this across a single render pass, so a layout and three
@@ -26,18 +50,13 @@ import type { AuthenticatedUser, UserRole } from "@/types/models";
  */
 export const getCurrentUser = cache(
   async (): Promise<AuthenticatedUser | null> => {
-    const supabase = await createSupabaseServerClient();
+    const user = await getAuthUser();
 
-    // getUser() revalidates the JWT with the Auth server. getSession() only
-    // decodes the cookie, which a client could have tampered with.
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (!user) {
       return null;
     }
+
+    const supabase = await createSupabaseServerClient();
 
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -71,10 +90,9 @@ export async function isAuthenticated(): Promise<boolean> {
  * worth distinguishing, since it means "ask your manager", not "sign in again".
  */
 export async function requireAuth(): Promise<AuthenticatedUser> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // The same cached call `getCurrentUser()` makes below, so the two states this
+  // function distinguishes cost ONE revalidation of the JWT rather than two.
+  const user = await getAuthUser();
 
   if (!user) {
     redirect(ROUTES.login);
