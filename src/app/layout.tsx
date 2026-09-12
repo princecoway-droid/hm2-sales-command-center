@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { Analytics } from "@vercel/analytics/next";
+
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app";
 
 import "./globals.css";
@@ -24,6 +26,7 @@ export default function RootLayout({
           throughout the application are translucent against. */}
       <body className="min-h-dvh text-slate-900 antialiased">
         {children}
+        <Analytics />
       </body>
     </html>
   );
