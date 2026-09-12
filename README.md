@@ -1,4 +1,4 @@
-# HM2 Sales Command Center
+# CRS2058 HM Performance Dashboard
 
 Internal sales-performance dashboard for the Coway HM2 management team.
 

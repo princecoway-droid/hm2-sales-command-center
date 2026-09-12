@@ -26,7 +26,7 @@ export function HmNotFoundState({ backHref }: HmNotFoundProps) {
       </p>
 
       <Link href={backHref} className="mt-5 inline-block">
-        <Button>Back to HM2 Dashboard</Button>
+        <Button>Back to Dashboard</Button>
       </Link>
     </div>
   );

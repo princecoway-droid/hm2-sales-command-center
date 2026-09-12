@@ -79,7 +79,7 @@ export default async function ShareHmPage(
           hm={detail.hm}
           month={detail.month}
           backHref={detail.backHref}
-          // Never "Back to HM2 Dashboard": the reader has no dashboard.
+          // Never "Back to Dashboard": the reader has no dashboard.
           backLabel="Back to report"
           updatedLabel={detail.updatedLabel}
           // No `controls`, so no month switcher. The token names the month.

@@ -1520,7 +1520,7 @@ section("[20] the layout contract the HM screen is built to");
 
   check(
     "back is a real link, at a comfortable tap size",
-    header.includes("min-h-11") && header.includes("Back to HM2 Dashboard"),
+    header.includes("min-h-11") && header.includes("Back to Dashboard"),
   );
 
   check(

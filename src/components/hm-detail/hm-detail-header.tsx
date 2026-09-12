@@ -13,7 +13,7 @@ type HmDetailHeaderProps = {
    * What the back link says. Defaults to the dashboard, which is where this
    * screen is reached from inside the application.
    *
-   * Overridden by the read-only view behind a share token, where "Back to HM2
+   * Overridden by the read-only view behind a share token, where "Back to
    * Dashboard" would name a screen the reader cannot open and has never seen.
    * The label travels with the href for that reason: the two are one statement,
    * and a link whose words and destination disagree is worse than no link.
@@ -44,7 +44,7 @@ export function HmDetailHeader({
   hm,
   month,
   backHref,
-  backLabel = "Back to HM2 Dashboard",
+  backLabel = "Back to Dashboard",
   updatedLabel,
   controls,
 }: HmDetailHeaderProps) {

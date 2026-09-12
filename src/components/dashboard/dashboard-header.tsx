@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { RefreshButton } from "@/components/dashboard/refresh-button";
+import { APP_NAME } from "@/lib/app";
 
 type DashboardHeaderProps = {
   /** The month everything below is scoped to. Always shown, never implied. */
@@ -32,8 +33,11 @@ export function DashboardHeader({
   return (
     <header className="flex flex-col gap-4 border-b hairline pb-5 lg:flex-row lg:items-end lg:justify-between">
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          HM2 Sales Command Center
+        {/* Imported rather than typed out: this line and the browser tab are
+            the same name, and a hardcoded copy here is how the two drift apart
+            the next time it changes. */}
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          {APP_NAME}
         </p>
 
         {/* The month is the title. The quarter rides beside it as a quiet chip
